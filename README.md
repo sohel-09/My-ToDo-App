@@ -86,3 +86,14 @@ When running inside Docker, the frontend uses the container hostname backend to 
 
 ---
 
+## About docker-compose.yml
+
+### The docker-compose.yml file is the backbone of this project. It defines and manages all the services (frontend, backend, and database) in a single configuration. Instead of running multiple docker run commands manually, Docker Compose makes it easy to start the entire stack with just one command.
+
+db service: Runs MySQL with a persistent volume (db_data) to ensure data is not lost when containers stop. It also runs initialization scripts from db/init.sql during the first startup.
+
+backend service: A Node.js Express API that connects to the MySQL database using environment variables (DB_HOST, DB_USER, etc.). It depends on the database container to ensure proper startup order.
+
+frontend service: A static site served using Nginx. It communicates with the backend API via the internal Docker network using the container name (backend) instead of localhost.
+
+By default, Docker Compose creates an isolated network so that containers can resolve each other by their service names, simplifying service-to-service communication. This removes the need to configure IP addresses or links manually.
