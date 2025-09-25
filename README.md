@@ -4,7 +4,7 @@
 A simple ToDo application with a **frontend**, **backend**, and **MySQL database**, fully containerized using **Docker**. This project demonstrates how to structure a full-stack app with persistent storage and container orchestration.
 
 ---
-
+```
 ## **Project Structure**
 ````
 ToDo-app/
