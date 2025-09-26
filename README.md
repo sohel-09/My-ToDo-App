@@ -46,6 +46,9 @@ ToDo-app/
 
 ```
 git clone 
+```
+2. **Move to project directory:**
+```
 cd ToDo-app
 
 ```
@@ -98,3 +101,4 @@ backend service: A Node.js Express API that connects to the MySQL database using
 frontend service: A static site served using Nginx. It communicates with the backend API via the internal Docker network using the container name (backend) instead of localhost.
 
 By default, Docker Compose creates an isolated network so that containers can resolve each other by their service names, simplifying service-to-service communication. This removes the need to configure IP addresses or links manually.
+
