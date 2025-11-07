@@ -33,6 +33,7 @@ stages:
           gcloud auth activate-service-account $SERVICE_ACCOUNT --key-file=key.json
           gcloud config set project $PROJECT_ID
           gcloud auth configure-docker $REGION-docker.pkg.dev -q
+        displayName: 'Authenticate to Google Artifact Registry'
 
     - task: Bash@3
       displayName: Build Docker Images
