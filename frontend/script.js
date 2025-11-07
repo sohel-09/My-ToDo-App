@@ -5,42 +5,6 @@ const apiUrl =
     ? "http://localhost:5000/tasks"
     : "http://backend:5000/tasks";
 
-// async function fetchTasks() {
-//   try {
-//     const res = await fetch(apiUrl);
-//     if (!res.ok) throw new Error("Failed to fetch tasks");
-//     const tasks = await res.json();
-//     const taskList = document.getElementById("taskList");
-//     taskList.innerHTML = "";
-
-//     tasks.forEach(task => {
-//       const li = document.createElement("li");
-
-//       // Task title
-//       const span = document.createElement("span");
-//       span.textContent = task.title;
-
-//       // Toggle completed on click
-//       span.addEventListener("click", () => {
-//         span.classList.toggle("completed");
-//       });
-
-//       // Delete button
-//       const delBtn = document.createElement("button");
-//       delBtn.textContent = "Remove";
-//       delBtn.onclick = () => deleteTask(task.id);
-
-//       li.appendChild(span);
-//       li.appendChild(delBtn);
-//       taskList.appendChild(li);
-//     });
-//   } catch (err) {
-//     console.error(err);
-//     alert("Cannot fetch tasks. Check backend is running.");
-//   }
-// }
-
-
 async function fetchTasks() {
   try {
     const res = await fetch(apiUrl);

@@ -1,0 +1,13 @@
+# Node
+node_modules/
+
+# Build artifacts
+dist/
+build/
+
+# Docker
+*.log
+*.tmp
+
+# GCP service account key (sensitive)
+key.json
