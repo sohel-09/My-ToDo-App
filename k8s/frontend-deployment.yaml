@@ -13,7 +13,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: asia-south1-docker.pkg.dev/todo-project-123/todo-repo/frontend:latest
+          image: asia-south1-docker.pkg.dev/fluted-factor-438905-d2/todo-repo/frontend:latest
           ports:
             - containerPort: 80
 ---
