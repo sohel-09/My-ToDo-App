@@ -29,11 +29,12 @@ stages:
       inputs:
         targetType: 'inline'
         script: |
-          echo "$GCLOUD_SERVICE_KEY" > key.json
-          gcloud auth activate-service-account $SERVICE_ACCOUNT --key-file=key.json
-          gcloud config set project $PROJECT_ID
-          gcloud auth configure-docker $REGION-docker.pkg.dev -q
-        displayName: 'Authenticate to Google Artifact Registry'
+          echo "Authenticating to Google Cloud..."
+          echo "$GCLOUD_SERVICE_KEY" > ${HOME}/gcloud-key.json
+          gcloud auth activate-service-account todo-deployer@fluted-factor-438905-d2.iam.gserviceaccount.com --key-file=${HOME}/gcloud-key.json
+          gcloud config set project fluted-factor-438905-d2
+          gcloud auth configure-docker asia-south1-docker.pkg.dev -q
+        displayName: 'Authenticate to Google Cloud Artifact Registry'
 
     - task: Bash@3
       displayName: Build Docker Images
