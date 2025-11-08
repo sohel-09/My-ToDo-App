@@ -24,7 +24,7 @@ stages:
     steps:
     - checkout: self
 
-    # ✅ Fixed Authentication Step
+    #  Fixed Authentication Step
     - task: Bash@3
       displayName: 'Authenticate to Google Artifact Registry'
       inputs:
