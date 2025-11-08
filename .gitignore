@@ -11,3 +11,4 @@ build/
 
 # GCP service account key (sensitive)
 key.json
+*.txt
