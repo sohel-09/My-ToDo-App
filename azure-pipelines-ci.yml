@@ -29,7 +29,8 @@ stages:
       inputs:
         targetType: 'inline'
         script: |
-          echo "$GCLOUD_SERVICE_KEY" > ${HOME}/gcloud-key.json
+          echo "$GCLOUD_SERVICE_KEY" | tr -d '\r' > gcloud-key.json
+          cat gcloud-key.json | jq . > /dev/null  # sanity check for valid JSON
           gcloud auth activate-service-account todo-deployer@fluted-factor-438905-d2.iam.gserviceaccount.com \
             --key-file=${HOME}/gcloud-key.json
           gcloud config set project fluted-factor-438905-d2

@@ -1,0 +1,21 @@
+to-do deployment
+
+
+PROJECT_ID="fluted-factor-438905-d2"
+SERVICE_ACCOUNT="todo-deployer@$PROJECT_ID.iam.gserviceaccount.com"
+
+gcloud projects add-iam-policy-binding $PROJECT_ID --member="serviceAccount:$SERVICE_ACCOUNT" --role="roles/container.admin"
+
+gcloud iam service-accounts keys create key.json --iam-account=todo-deployer@fluted-factor-438905-d2.iam.gserviceaccount.com --project=fluted-factor-438905-d2
+
+gcloud artifacts repositories create todo-repo --repository-format=docker --location=asia-south1 --description="ToDo App Docker Images"
+
+gcloud container clusters create todo-cluster --zone asia-south1-a --num-nodes 3 --project fluted-factor-438905-d2
+
+gcloud container clusters get-credentials todo-cluster --zone asia-south1-a --project fluted-factor-438905-d2
+
+
+kubectl create secret generic mysql-secret --from-literal=mysql-root-password=root
+
+
+gcloud projects add-iam-policy-binding fluted-factor-438905-d2 --member="serviceAccount:todo-deployer@fluted-factor-438905-d2.iam.gserviceaccount.com" --role="roles/artifactregistry.writer"
