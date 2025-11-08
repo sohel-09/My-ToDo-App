@@ -6,6 +6,7 @@ A simple ToDo application with a **frontend**, **backend**, and **MySQL database
 ---
 
 ## **Project Structure**
+-----
 
 ```
 ToDo-app/
