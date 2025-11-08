@@ -10,21 +10,34 @@ A simple ToDo application with a **frontend**, **backend**, and **MySQL database
 ```
 ToDo-app/
 │
-├── frontend/ # Static website served with Nginx
-│ ├── index.html
-│ ├── style.css
-│ ├── script.js
-│ └── Dockerfile
+├── frontend/
+│   ├── index.html
+│   ├── style.css
+│   ├── script.js
+│   └── Dockerfile
 │
-├── backend/ # Node.js API server
-│ ├── server.js
-│ ├── package.json
-│ └── Dockerfile
+├── backend/
+│   ├── server.js
+│   ├── package.json
+│   └── Dockerfile
 │
-├── db/ # Database initialization scripts
-│ └── init.sql
+├── db/
+│   └── init.sql
 │
-└── docker-compose.yml # Docker Compose file to orchestrate services
+├── docker-compose.yml
+│
+├── k8s/
+│   ├── frontend-deployment.yaml
+│   ├── backend-deployment.yaml
+│   ├── mysql-deployment.yaml
+│   ├── frontend-service.yaml
+│   ├── backend-service.yaml
+│   └── mysql-service.yaml
+│
+└── azure-pipelines-ci.yml
+│
+└──azure-pipelines-cd.yml
+
 ```
 
 
