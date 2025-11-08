@@ -36,7 +36,7 @@ ToDo-app/
 │
 └── azure-pipelines-ci.yml
 │
-└──azure-pipelines-cd.yml
+└── azure-pipelines-cd.yml
 
 ```
 
