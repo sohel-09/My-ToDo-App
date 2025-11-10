@@ -24,54 +24,54 @@ stages:
     steps:
     - checkout: self
 
-    #  Fixed Authentication Step
+    # ✅ Download Secure File (GCP Service Account JSON)
+    - task: DownloadSecureFile@1
+      name: GCloudKey
+      inputs:
+        secureFile: 'key.json'   # the exact name you uploaded to Secure Files
+
+    # ✅ Authenticate to Google Cloud
     - task: Bash@3
       displayName: 'Authenticate to Google Artifact Registry'
       inputs:
         targetType: 'inline'
         script: |
-          echo "Decoding Base64 service key..."
-          if [ -z "$GCLOUD_SERVICE_KEY_B64" ]; then
-            echo "GCLOUD_SERVICE_KEY_B64 variable is empty!"
-            exit 1
-          fi
-          
-          echo "$GCLOUD_SERVICE_KEY_B64" | tr -d '\r' | base64 --decode > ${HOME}/gcloud-key.json 2>/dev/null || {
-            echo "Base64 decode failed. Check the variable formatting."; exit 1;
-          }
-
-          echo "✅ Key decoded, validating JSON..."
-          head -n 5 ${HOME}/gcloud-key.json
-          gcloud auth activate-service-account $SERVICE_ACCOUNT --key-file=${HOME}/gcloud-key.json
+          echo "Authenticating with Google Cloud using secure key..."
+          gcloud auth activate-service-account $SERVICE_ACCOUNT --key-file "$(GCloudKey.secureFilePath)"
           gcloud config set project $PROJECT_ID
           gcloud auth configure-docker $REGION-docker.pkg.dev --quiet
       env:
-        GCLOUD_SERVICE_KEY_B64: $(GCLOUD_SERVICE_KEY_B64)
         PROJECT_ID: $(PROJECT_ID)
         REGION: $(REGION)
         SERVICE_ACCOUNT: $(SERVICE_ACCOUNT)
+
+    # ✅ Build Docker Images
     - task: Bash@3
-      displayName: Build Docker Images
+      displayName: 'Build Docker Images'
       inputs:
         targetType: 'inline'
         script: |
+          echo "Building Docker images..."
           docker build -t frontend:$(Build.BuildId) ./frontend
           docker build -t backend:$(Build.BuildId) ./backend
 
+    # Push Docker Images to Google Artifact Registry
     - task: Bash@3
-      displayName: Push to Google Artifact Registry
+      displayName: 'Push to Google Artifact Registry'
       inputs:
         targetType: 'inline'
         script: |
+          echo "Tagging and pushing images to Artifact Registry..."
           docker tag frontend:$(Build.BuildId) $REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/frontend:$(Build.BuildId)
           docker tag backend:$(Build.BuildId) $REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/backend:$(Build.BuildId)
-          
+
           docker push $REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/frontend:$(Build.BuildId)
           docker push $REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/backend:$(Build.BuildId)
 
+    # Publish Kubernetes manifests for CD stage
     - publish: k8s
       artifact: k8s-manifests
-      displayName: Publish Kubernetes manifests as artifacts
+      displayName: 'Publish Kubernetes manifests as artifacts'
 
 # ---------- Stage 2: Trigger CD ----------
 - stage: TriggerCD
