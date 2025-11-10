@@ -73,23 +73,4 @@ stages:
       artifact: k8s-manifests
       displayName: 'Publish Kubernetes manifests as artifacts'
 
-# ---------- Stage 2: Trigger CD ----------
-- stage: TriggerCD
-  displayName: Trigger CD Pipeline
-  dependsOn: Build
-  jobs:
-  - job: TriggerDeploy
-    displayName: Trigger Continuous Deployment
-    steps:
-    - task: DownloadPipelineArtifact@2
-      inputs:
-        artifact: 'k8s-manifests'
-        path: '$(Pipeline.Workspace)/k8s'
 
-    - task: Bash@3
-      displayName: 'Trigger CD Pipeline'
-      inputs:
-        targetType: 'inline'
-        script: |
-          echo "Triggering CD pipeline for deployment..."
-          echo "##vso[build.queueBuild]definitionName=ToDo-CD"
