@@ -1,4 +1,63 @@
-trigger: none  # triggered by CI pipeline
+# trigger: none  # triggered by CI pipeline
+
+# pool:
+#   vmImage: ubuntu-latest
+
+# variables:
+#   PROJECT_ID: 'fluted-factor-438905-d2'
+#   REGION: 'asia-south1'
+#   REPO_NAME: 'todo-repo'
+#   CLUSTER_NAME: 'todo-cluster'
+#   CLUSTER_ZONE: 'asia-south1-a'
+#   SERVICE_ACCOUNT: 'todo-deployer@fluted-factor-438905-d2.iam.gserviceaccount.com'
+
+# stages:
+# - stage: Deploy
+#   displayName: Deploy to GKE
+#   jobs:
+#   - deployment: DeployToGKE
+#     environment: 'production'
+#     strategy:
+#       runOnce:
+#         deploy:
+#           steps:
+#           - checkout: self
+
+#           - task: Bash@3
+#             displayName: Authenticate with Google Cloud
+#             inputs:
+#               targetType: 'inline'
+#               script: |
+#                 echo "$GCLOUD_SERVICE_KEY" > key.json
+#                 gcloud auth activate-service-account $SERVICE_ACCOUNT --key-file=key.json
+#                 gcloud config set project $PROJECT_ID
+#                 gcloud container clusters get-credentials $CLUSTER_NAME --zone $CLUSTER_ZONE --project $PROJECT_ID
+
+#           - task: Bash@3
+#             displayName: Deploy to GKE
+#             inputs:
+#               targetType: 'inline'
+#               script: |
+#                 BUILD_ID=$(Build.BuildId)
+#                 echo "Deploying images tagged with Build ID: $BUILD_ID"
+#                 sed -i "s|IMAGE_FRONTEND|$REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/frontend:$BUILD_ID|g" k8s/frontend-deployment.yaml
+#                 sed -i "s|IMAGE_BACKEND|$REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/backend:$BUILD_ID|g" k8s/backend-deployment.yaml
+
+#                 kubectl apply -f k8s/
+
+
+# ----------------- CD PIPELINE -----------------
+# Triggered automatically when CI pipeline (ToDo-CI) completes successfully
+
+trigger: none  # do not trigger on code pushes
+
+resources:
+  pipelines:
+    - pipeline: CI           # alias
+      source: ToDo-CI        # 👈 exact name of your CI pipeline in Azure DevOps
+      trigger:
+        branches:
+          - main             # triggers CD only when CI on main completes
 
 pool:
   vmImage: ubuntu-latest
@@ -23,24 +82,44 @@ stages:
           steps:
           - checkout: self
 
+          # ✅ Download the same secure key file used in CI
+          - task: DownloadSecureFile@1
+            name: GCloudKey
+            inputs:
+              secureFile: 'key.json'   # must match the name in Secure Files
+
+          # ✅ Authenticate with Google Cloud using secure key
           - task: Bash@3
-            displayName: Authenticate with Google Cloud
+            displayName: 'Authenticate with Google Cloud'
             inputs:
               targetType: 'inline'
               script: |
-                echo "$GCLOUD_SERVICE_KEY" > key.json
-                gcloud auth activate-service-account $SERVICE_ACCOUNT --key-file=key.json
+                echo "Authenticating to GCP and configuring kubectl..."
+                gcloud auth activate-service-account $SERVICE_ACCOUNT --key-file "$(GCloudKey.secureFilePath)"
                 gcloud config set project $PROJECT_ID
                 gcloud container clusters get-credentials $CLUSTER_NAME --zone $CLUSTER_ZONE --project $PROJECT_ID
+            env:
+              PROJECT_ID: $(PROJECT_ID)
+              CLUSTER_NAME: $(CLUSTER_NAME)
+              CLUSTER_ZONE: $(CLUSTER_ZONE)
+              SERVICE_ACCOUNT: $(SERVICE_ACCOUNT)
 
+          # ✅ Deploy images to GKE
           - task: Bash@3
-            displayName: Deploy to GKE
+            displayName: 'Deploy to GKE'
             inputs:
               targetType: 'inline'
               script: |
-                BUILD_ID=$(Build.BuildId)
+                BUILD_ID=$(resources.pipeline.CI.runID)
                 echo "Deploying images tagged with Build ID: $BUILD_ID"
+
+                # Update manifests with the correct image tags
                 sed -i "s|IMAGE_FRONTEND|$REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/frontend:$BUILD_ID|g" k8s/frontend-deployment.yaml
                 sed -i "s|IMAGE_BACKEND|$REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/backend:$BUILD_ID|g" k8s/backend-deployment.yaml
 
+                # Apply to cluster
                 kubectl apply -f k8s/
+            env:
+              REGION: $(REGION)
+              PROJECT_ID: $(PROJECT_ID)
+              REPO_NAME: $(REPO_NAME)
