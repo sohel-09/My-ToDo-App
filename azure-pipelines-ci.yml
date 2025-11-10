@@ -25,19 +25,30 @@ stages:
     - checkout: self
 
     - task: Bash@3
-      displayName: Authenticate with Google Cloud
+      displayName: 'Authenticate to Google Artifact Registry'
       inputs:
         targetType: 'inline'
         script: |
-          echo "$GCLOUD_SERVICE_KEY" | tr -d '\r' > gcloud-key.json
-          cat gcloud-key.json | jq . > /dev/null  # sanity check for valid JSON
-          gcloud auth activate-service-account todo-deployer@fluted-factor-438905-d2.iam.gserviceaccount.com \
-            --key-file=${HOME}/gcloud-key.json
-          gcloud config set project fluted-factor-438905-d2
-          gcloud auth configure-docker asia-south1-docker.pkg.dev -q
-        env:
-          GCLOUD_SERVICE_KEY: $(GCLOUD_SERVICE_KEY)
-        displayName: 'Authenticate to Google Artifact Registry'
+          echo "Decoding Base64 service key..."
+          if [ -z "$GCLOUD_SERVICE_KEY_B64" ]; then
+            echo "❌ GCLOUD_SERVICE_KEY_B64 variable is empty!"
+            exit 1
+          fi
+          
+          echo "$GCLOUD_SERVICE_KEY_B64" | tr -d '\r' | base64 --decode > ${HOME}/gcloud-key.json 2>/dev/null || {
+            echo "❌ Base64 decode failed. Check the variable formatting."; exit 1;
+          }
+
+          echo "✅ Key decoded, validating JSON..."
+          head -n 5 ${HOME}/gcloud-key.json
+          gcloud auth activate-service-account $SERVICE_ACCOUNT --key-file=${HOME}/gcloud-key.json
+          gcloud config set project $PROJECT_ID
+          gcloud auth configure-docker $REGION-docker.pkg.dev --quiet
+      env:
+        GCLOUD_SERVICE_KEY_B64: $(GCLOUD_SERVICE_KEY_B64)
+        PROJECT_ID: $(PROJECT_ID)
+        REGION: $(REGION)
+        SERVICE_ACCOUNT: $(SERVICE_ACCOUNT)
 
     - task: Bash@3
       displayName: Build Docker Images
