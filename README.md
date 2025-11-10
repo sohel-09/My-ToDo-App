@@ -34,8 +34,7 @@ ToDo-app/
 │   ├── backend-service.yaml
 │   └── mysql-service.yaml
 │
-└── azure-pipelines-ci.yml
-│
+├── azure-pipelines-ci.yml
 └── azure-pipelines-cd.yml
 
 ```

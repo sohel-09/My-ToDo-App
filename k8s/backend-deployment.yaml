@@ -1,3 +1,68 @@
+# apiVersion: apps/v1
+# kind: Deployment
+# metadata:
+#   name: backend
+# spec:
+#   replicas: 1
+#   selector:
+#     matchLabels:
+#       app: backend
+#   template:
+#     metadata:
+#       labels:
+#         app: backend
+#     spec:
+#       containers:
+#         - name: backend
+#           image: IMAGE_BACKEND   # <-- Dynamic placeholder for CI/CD pipeline
+#           ports:
+#             - containerPort: 3000
+#           env:
+#             - name: DB_HOST
+#               value: mysql-service     # MySQL service name (internal DNS)
+#             - name: DB_USER
+#               value: root
+#             - name: DB_PASSWORD
+#               valueFrom:
+#                 secretKeyRef:
+#                   name: mysql-secret
+#                   key: mysql-root-password
+
+#             - name: DB_NAME
+#               value: todo
+#           resources:
+#             requests:
+#               cpu: "100m"
+#               memory: "128Mi"
+#             limits:
+#               cpu: "300m"
+#               memory: "256Mi"
+#           readinessProbe:
+#             tcpSocket:
+#               port: 3000
+#             initialDelaySeconds: 5
+#             periodSeconds: 10
+#           livenessProbe:
+#             tcpSocket:
+#               port: 3000
+#             initialDelaySeconds: 15
+#             periodSeconds: 20
+# ---
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: backend-service
+#   labels:
+#     app: backend
+# spec:
+#   type: ClusterIP    # Internal only (frontend calls backend inside cluster)
+#   selector:
+#     app: backend
+#   ports:
+#     - name: http
+#       port: 3000
+#       targetPort: 3000
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -14,20 +79,19 @@ spec:
     spec:
       containers:
         - name: backend
-          image: IMAGE_BACKEND   # <-- Dynamic placeholder for CI/CD pipeline
+          image: IMAGE_BACKEND   # <-- dynamically replaced by CI/CD
           ports:
             - containerPort: 3000
           env:
             - name: DB_HOST
-              value: mysql-service     # MySQL service name (internal DNS)
+              value: mysql-service          # internal DNS name
             - name: DB_USER
-              value: root
+              value: root                   # using MySQL root user
             - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: mysql-secret
-                  key: mysql-root-password
-
+                  key: mysql-root-password  # ✅ matches mysql-secret.yaml
             - name: DB_NAME
               value: todo
           resources:
@@ -55,10 +119,11 @@ metadata:
   labels:
     app: backend
 spec:
-  type: ClusterIP    # Internal only (frontend calls backend inside cluster)
+  type: ClusterIP
   selector:
     app: backend
   ports:
     - name: http
       port: 3000
       targetPort: 3000
+
