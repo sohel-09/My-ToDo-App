@@ -2,10 +2,8 @@ apiVersion: v1
 kind: Service
 metadata:
   name: backend-service
-  labels:
-    app: backend
 spec:
-  type: ClusterIP
+  type: LoadBalancer          # ✅ change from ClusterIP
   selector:
     app: backend
   ports:
