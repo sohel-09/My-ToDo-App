@@ -6,7 +6,7 @@ trigger: none  # do not trigger on code pushes
 resources:
   pipelines:
     - pipeline: CI            # alias
-      source: ToDo-CI         # ✅ exact CI pipeline name in Azure DevOps (not YAML filename)
+      source: azure-pipelines-ci        # ✅ exact CI pipeline name in Azure DevOps (not YAML filename)
       trigger:
         branches:
           - main              # triggers CD only when CI on main completes
