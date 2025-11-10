@@ -30,8 +30,18 @@ stages:
       inputs:
         targetType: 'inline'
         script: |
-          echo "$GCLOUD_SERVICE_KEY_B64" | base64 --decode > ${HOME}/gcloud-key.json
-          echo "✅ Decoded service account key"
+          echo "Decoding Base64 service key..."
+          if [ -z "$GCLOUD_SERVICE_KEY_B64" ]; then
+            echo "GCLOUD_SERVICE_KEY_B64 variable is empty!"
+            exit 1
+          fi
+          
+          echo "$GCLOUD_SERVICE_KEY_B64" | tr -d '\r' | base64 --decode > ${HOME}/gcloud-key.json 2>/dev/null || {
+            echo "Base64 decode failed. Check the variable formatting."; exit 1;
+          }
+
+          echo "✅ Key decoded, validating JSON..."
+          head -n 5 ${HOME}/gcloud-key.json
           gcloud auth activate-service-account $SERVICE_ACCOUNT --key-file=${HOME}/gcloud-key.json
           gcloud config set project $PROJECT_ID
           gcloud auth configure-docker $REGION-docker.pkg.dev --quiet
@@ -40,7 +50,6 @@ stages:
         PROJECT_ID: $(PROJECT_ID)
         REGION: $(REGION)
         SERVICE_ACCOUNT: $(SERVICE_ACCOUNT)
-
     - task: Bash@3
       displayName: Build Docker Images
       inputs:
