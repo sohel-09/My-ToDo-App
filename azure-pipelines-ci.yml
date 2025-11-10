@@ -15,7 +15,7 @@ variables:
   CD_PIPELINE_NAME: 'azure-pipelines-cd.yml'  # Name of the CD pipeline file
 
 stages:
-# ---------- Stage 1: Build and Push ----------
+# ---------- Stage 1: Build and Push -----------
 - stage: Build
   displayName: Build and Push Docker Images
   jobs:
