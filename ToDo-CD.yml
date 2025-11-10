@@ -5,11 +5,11 @@ trigger: none  # do not trigger on code pushes
 
 resources:
   pipelines:
-    - pipeline: CI            # alias
-      source: azure-pipelines-ci        # ✅ exact CI pipeline name in Azure DevOps (not YAML filename)
-      trigger:
-        branches:
-          - main              # triggers CD only when CI on main completes
+  - pipeline: CI        # <-- alias name (can be anything)
+    source: ToDo-CI # <-- must match the CI pipeline name as seen in Azure DevOps
+    trigger:
+      branches:
+        - main           # triggers CD only when CI on main completes
 
 pool:
   vmImage: ubuntu-latest
