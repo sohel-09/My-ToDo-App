@@ -55,7 +55,7 @@ stages:
           docker build -t frontend:$(Build.BuildId) ./frontend
           docker build -t backend:$(Build.BuildId) ./backend
 
-    # ✅ Push Docker Images to Google Artifact Registry
+    # Push Docker Images to Google Artifact Registry
     - task: Bash@3
       displayName: 'Push to Google Artifact Registry'
       inputs:
@@ -68,7 +68,7 @@ stages:
           docker push $REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/frontend:$(Build.BuildId)
           docker push $REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/backend:$(Build.BuildId)
 
-    # ✅ Publish Kubernetes manifests for CD stage
+    # Publish Kubernetes manifests for CD stage
     - publish: k8s
       artifact: k8s-manifests
       displayName: 'Publish Kubernetes manifests as artifacts'
