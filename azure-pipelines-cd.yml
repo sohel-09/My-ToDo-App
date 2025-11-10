@@ -1,4 +1,4 @@
-# ----------------- CD PIPELINE -----------------
+# ----------------- CD PIPELINE ------------------
 # Triggered automatically when CI pipeline (ToDo-CI) completes successfully
 
 trigger: none  # do not trigger on code pushes
