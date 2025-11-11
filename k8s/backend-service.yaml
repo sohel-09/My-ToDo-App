@@ -3,10 +3,10 @@ kind: Service
 metadata:
   name: backend-service
 spec:
-  type: LoadBalancer          # ✅ change from ClusterIP
+  type: LoadBalancer          
   selector:
     app: backend
   ports:
     - name: http
-      port: 3000
+      port: 5000
       targetPort: 3000

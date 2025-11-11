@@ -59,6 +59,6 @@ spec:
     app: backend
   ports:
     - name: http
-      port: 3000
+      port: 5000
       targetPort: 3000
 
