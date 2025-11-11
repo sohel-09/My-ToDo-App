@@ -80,10 +80,11 @@ stages:
               SERVICE_ACCOUNT: $(SERVICE_ACCOUNT)
 
           - task: Bash@3
-            displayName: 'Create or Update Secrets & ConfigMaps'
+            displayName: 'Create or Update Secrets and ConfigMaps'
             inputs:
               targetType: 'inline'
               script: |
+                echo "Ensuring Secrets and ConfigMaps exist..."
                 kubectl create configmap backend-config \
                   --from-literal=DB_HOST=mysql-service \
                   --from-literal=DB_USER=root \
@@ -92,10 +93,12 @@ stages:
                   --from-literal=PORT=3000 \
                   --from-literal=ALLOWED_ORIGIN=* \
                   --dry-run=client -o yaml | kubectl apply -f -
-
+                
                 kubectl create secret generic mysql-secret \
-                  --from-literal=mysql-root-password=$(DB_PASSWORD) \
+                  --from-literal=mysql-root-password=root \
                   --dry-run=client -o yaml | kubectl apply -f -
+
+                echo "✅ Secrets and ConfigMaps ensured successfully."
 
           # Deploy images to GKE
           - task: Bash@3
@@ -120,17 +123,36 @@ stages:
             inputs:
               targetType: 'inline'
               script: |
-                echo "Waiting for MySQL pod to be ready..."
-                kubectl wait --for=condition=ready pod -l app=mysql --timeout=180s
+                echo "Waiting for MySQL pod to become ready..."
+                kubectl wait --for=condition=ready pod -l app=mysql --timeout=300s
+                echo "✅ MySQL pod is ready."
 
           # Step: Auto-create Database and Table
+          - task: Bash@3
+            displayName: 'Wait until MySQL is accepting connections'
+            inputs:
+              targetType: 'inline'
+              script: |
+                MYSQL_POD=$(kubectl get pod -l app=mysql -o jsonpath="{.items[0].metadata.name}")
+                echo "Checking MySQL readiness inside pod: $MYSQL_POD"
+                
+                # Loop until MySQL responds
+                for i in {1..30}; do
+                  kubectl exec $MYSQL_POD -- mysqladmin ping -u root -proot --silent && break
+                  echo "⏳ Waiting for MySQL to be ready... ($i/30)"
+                  sleep 5
+                done
+
+                echo "✅ MySQL is accepting connections now."
+
+          # ✅ Create database and table
           - task: Bash@3
             displayName: 'Initialize Database Schema (todo.tasks)'
             inputs:
               targetType: 'inline'
               script: |
-                echo "Running database initialization inside MySQL pod..."
                 MYSQL_POD=$(kubectl get pod -l app=mysql -o jsonpath="{.items[0].metadata.name}")
+                echo "Running database initialization inside $MYSQL_POD..."
 
                 kubectl exec -i $MYSQL_POD -- mysql -u root -proot <<EOF
                 CREATE DATABASE IF NOT EXISTS todo;
