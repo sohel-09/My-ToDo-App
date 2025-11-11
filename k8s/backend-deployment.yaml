@@ -14,19 +14,18 @@ spec:
     spec:
       containers:
         - name: backend
-          image: IMAGE_BACKEND   # <-- dynamically replaced by CI/CD
+          image: IMAGE_BACKEND
           ports:
             - containerPort: 3000
+          envFrom:
+            - configMapRef:
+                name: backend-config
           env:
-            - name: DB_HOST
-              value: mysql-service          # internal DNS name
-            - name: DB_USER
-              value: root                   # using MySQL root user
             - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: mysql-secret
-                  key: mysql-root-password  # ✅ matches mysql-secret.yaml
+                  key: mysql-root-password
             - name: DB_NAME
               value: todo
           resources:

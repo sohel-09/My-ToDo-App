@@ -6,6 +6,8 @@ setup.txt
 dist/
 build/
 
+
+.env
 # Docker
 *.log
 *.tmp

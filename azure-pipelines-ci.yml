@@ -24,13 +24,13 @@ stages:
     steps:
     - checkout: self
 
-    # ✅ Download Secure File (GCP Service Account JSON)
+    #  Download Secure File (GCP Service Account JSON)
     - task: DownloadSecureFile@1
       name: GCloudKey
       inputs:
-        secureFile: 'key.json'   # the exact name you uploaded to Secure Files
+        secureFile: 'key.json'   # file uploaded to Secure Files
 
-    # ✅ Authenticate to Google Cloud
+    # Authenticate to Google Cloud
     - task: Bash@3
       displayName: 'Authenticate to Google Artifact Registry'
       inputs:
@@ -45,7 +45,7 @@ stages:
         REGION: $(REGION)
         SERVICE_ACCOUNT: $(SERVICE_ACCOUNT)
 
-    # ✅ Build Docker Images
+    # Build Docker Images
     - task: Bash@3
       displayName: 'Build Docker Images'
       inputs:

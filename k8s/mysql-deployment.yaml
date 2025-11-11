@@ -24,7 +24,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: mysql-secret
-                  key: mysql-root-password     # ✅ matches secret.yaml
+                  key: mysql-root-password     #  secret.yaml
             - name: MYSQL_DATABASE
               value: todo
           resources:
@@ -56,9 +56,8 @@ spec:
           requests:
             storage: 5Gi
 ---
-# -------------------------
 # MySQL Service
-# -------------------------
+
 apiVersion: v1
 kind: Service
 metadata:
