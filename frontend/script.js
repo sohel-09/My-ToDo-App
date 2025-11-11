@@ -81,7 +81,7 @@ if (window.location.hostname === "localhost") {
 } else {
   // Running in production (frontend served from Kubernetes)
   // Frontend container talks to backend-service inside cluster
-  apiBaseUrl = "http://35.244.33.178:5000/tasks";
+  apiBaseUrl = "http://34.100.187.174/tasks";
 }
 
 async function fetchTasks() {
