@@ -99,24 +99,6 @@ stages:
                   --dry-run=client -o yaml | kubectl apply -f -
 
                 echo "✅ Secrets and ConfigMaps ensured successfully."
-
-          # Deploy images to GKE
-          - task: Bash@3
-            displayName: 'Deploy to GKE'
-            inputs:
-              targetType: 'inline'
-              script: |
-                export USE_GKE_GCLOUD_AUTH_PLUGIN=True
-                BUILD_ID=$(resources.pipeline.CI.runID)
-                echo "Deploying images tagged with Build ID: $BUILD_ID"
-                sed -i "s|IMAGE_FRONTEND|$REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/frontend:$BUILD_ID|g" k8s/frontend-deployment.yaml
-                sed -i "s|IMAGE_BACKEND|$REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/backend:$BUILD_ID|g" k8s/backend-deployment.yaml
-
-                kubectl apply -f k8s/ --validate=false
-            env:
-              REGION: $(REGION)
-              PROJECT_ID: $(PROJECT_ID)
-              REPO_NAME: $(REPO_NAME)
           # Step: Wait for MySQL Pod to be Ready
           - task: Bash@3
             displayName: 'Wait for MySQL Pod to be Ready'
@@ -145,7 +127,7 @@ stages:
 
                 echo "✅ MySQL is accepting connections now."
 
-          # ✅ Create database and table
+          # Create database and table
           - task: Bash@3
             displayName: 'Initialize Database Schema (todo.tasks)'
             inputs:
@@ -165,3 +147,20 @@ stages:
 
                 echo "✅ Database and table initialization completed successfully."
 
+          # Deploy images to GKE
+          - task: Bash@3
+            displayName: 'Deploy to GKE'
+            inputs:
+              targetType: 'inline'
+              script: |
+                export USE_GKE_GCLOUD_AUTH_PLUGIN=True
+                BUILD_ID=$(resources.pipeline.CI.runID)
+                echo "Deploying images tagged with Build ID: $BUILD_ID"
+                sed -i "s|IMAGE_FRONTEND|$REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/frontend:$BUILD_ID|g" k8s/frontend-deployment.yaml
+                sed -i "s|IMAGE_BACKEND|$REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/backend:$BUILD_ID|g" k8s/backend-deployment.yaml
+
+                kubectl apply -f k8s/ --validate=false
+            env:
+              REGION: $(REGION)
+              PROJECT_ID: $(PROJECT_ID)
+              REPO_NAME: $(REPO_NAME)
