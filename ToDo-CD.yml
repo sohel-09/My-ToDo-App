@@ -129,13 +129,21 @@ stages:
 
           # Create database and table
           - task: Bash@3
-            displayName: 'Initialize Database Schema (todo.tasks)'
+            displayName: 'Initialize Database and Table'
             inputs:
               targetType: 'inline'
               script: |
-                MYSQL_POD=$(kubectl get pod -l app=mysql -o jsonpath="{.items[0].metadata.name}")
-                echo "Running database initialization inside $MYSQL_POD..."
+                set -e
+                MYSQL_POD=mysql-0
+                echo "✅ Using MySQL pod: $MYSQL_POD"
 
+                for i in {1..30}; do
+                  kubectl exec $MYSQL_POD -- mysqladmin ping -u root -proot --silent && break
+                  echo "⏳ Waiting for MySQL to be ready... ($i/30)"
+                  sleep 5
+                done
+
+                echo "✅ MySQL accepting connections, creating database..."
                 kubectl exec -i $MYSQL_POD -- mysql -u root -proot <<EOF
                 CREATE DATABASE IF NOT EXISTS todo;
                 USE todo;
@@ -144,7 +152,6 @@ stages:
                     title VARCHAR(255) NOT NULL
                 );
                 EOF
-
                 echo "✅ Database and table initialization completed successfully."
 
           # Deploy images to GKE
