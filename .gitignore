@@ -1,5 +1,6 @@
 # Node
 node_modules/
+setup.txt
 
 # Build artifacts
 dist/
@@ -12,4 +13,3 @@ build/
 # GCP service account key (sensitive)
 key.json
 *.txt
-*.setup.txt
