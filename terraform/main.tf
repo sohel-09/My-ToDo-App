@@ -27,7 +27,7 @@ data "google_container_cluster" "todo_cluster" {
 # -------------------------------
 # CREATE ONLY NODE POOL (optional)
 # -------------------------------
-resource "google_container_node_pool" "todo_nodes" {
+data "google_container_node_pool" "todo_nodes" {
   name       = "todo-nodes"
   cluster    = data.google_container_cluster.todo_cluster.id
   location   = var.zone
