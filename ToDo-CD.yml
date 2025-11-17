@@ -374,6 +374,7 @@ stages:
           -var="project_id=$(PROJECT_ID)" \
           -var="region=$(REGION)" \
           -var="zone=$(CLUSTER_ZONE)"
+          -var="gcp_credentials=$(cat $(GCloudKey.secureFilePath))"
 
     # 6️⃣ INSTALL HELM
     - task: HelmInstaller@1
