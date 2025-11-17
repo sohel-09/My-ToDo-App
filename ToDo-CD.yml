@@ -305,22 +305,31 @@ stages:
     steps:
     - checkout: self
 
-    # ============================
-    # 1️⃣ Download CI artifacts
-    # ============================
+    # 1️⃣ DOWNLOAD ARTIFACTS
     - download: CI
       artifact: deploy_artifacts
+      displayName: "Download deploy artifacts"
+
     - task: Bash@3
-      displayName: "Extract Deployment Metadata"
+      displayName: "List downloaded artifacts"
       inputs:
         targetType: inline
         script: |
-          echo "Extracting deploy_info.txt..."
-          cat $(Pipeline.Workspace)/deploy_artifacts/deploy_info.txt
+          echo "Downloaded files:"
+          ls -R $(Pipeline.Workspace)/deploy_artifacts
 
-          export STATIC_IP=$(grep STATIC_IP $(Pipeline.Workspace)/deploy_artifacts/deploy_info.txt | cut -d'=' -f2)
-          export FRONTEND_TAG=$(grep FRONTEND_TAG $(Pipeline.Workspace)/deploy_artifacts/deploy_info.txt | cut -d'=' -f2)
-          export BACKEND_TAG=$(grep BACKEND_TAG $(Pipeline.Workspace)/deploy_artifacts/deploy_info.txt | cut -d'=' -f2)
+    # 2️⃣ PARSE deploy_info.txt
+    - task: Bash@3
+      displayName: "Extract deploy metadata"
+      inputs:
+        targetType: inline
+        script: |
+          FILE=$(Pipeline.Workspace)/deploy_artifacts/deploy_info.txt
+
+          export STATIC_IP=$(grep STATIC_IP $FILE | cut -d'=' -f2)
+          export FRONTEND_TAG=$(grep FRONTEND_TAG $FILE | cut -d'=' -f2)
+          export BACKEND_TAG=$(grep BACKEND_TAG $FILE | cut -d'=' -f2)
+
           echo "STATIC_IP=$STATIC_IP"
           echo "FRONTEND_TAG=$FRONTEND_TAG"
           echo "BACKEND_TAG=$BACKEND_TAG"
@@ -329,28 +338,38 @@ stages:
           echo "##vso[task.setvariable variable=FRONTEND_TAG]$FRONTEND_TAG"
           echo "##vso[task.setvariable variable=BACKEND_TAG]$BACKEND_TAG"
 
-    # ============================
-    # 2️⃣ Authenticate to GCP
-    # ============================
+
+    # 3️⃣ AUTHENTICATE GCP
     - task: DownloadSecureFile@1
       name: GCloudKey
       inputs:
         secureFile: 'key.json'
 
     - task: Bash@3
-      displayName: "Authenticate to GCP & Connect to GKE"
+      displayName: "Authenticate to GCP"
       inputs:
         targetType: inline
         script: |
+          echo "Authenticating..."
           gcloud auth activate-service-account $SERVICE_ACCOUNT --key-file "$(GCloudKey.secureFilePath)"
           gcloud config set project $PROJECT_ID
-          gcloud components install gke-gcloud-auth-plugin
           export USE_GKE_GCLOUD_AUTH_PLUGIN=True
-          gcloud container clusters get-credentials $CLUSTER_NAME --zone $CLUSTER_ZONE --project $PROJECT_ID
+          gcloud container clusters get-credentials $CLUSTER_NAME --zone $CLUSTER_ZONE
 
-    # ============================
-    # 3️⃣ Terraform — Apply Infrastructure
-    # ============================
+    # 4️⃣ INSTALL TERRAFORM
+    - task: Bash@3
+      displayName: "Install Terraform"
+      inputs:
+        targetType: inline
+        script: |
+          sudo apt-get update -y
+          sudo apt-get install -y wget unzip
+          wget https://releases.hashicorp.com/terraform/1.6.0/terraform_1.6.0_linux_amd64.zip
+          unzip terraform_1.6.0_linux_amd64.zip
+          sudo mv terraform /usr/local/bin/
+          terraform -version
+
+    # 5️⃣ TERRAFORM APPLY
     - task: Bash@3
       displayName: "Terraform Apply"
       inputs:
@@ -360,31 +379,28 @@ stages:
           terraform init
           terraform apply -auto-approve
 
-    # ============================
-    # 4️⃣ Helm Deployment
-    # ============================
+    # 6️⃣ INSTALL HELM
     - task: HelmInstaller@1
       inputs:
         helmVersionToInstall: '3.14.0'
 
+    # 7️⃣ HELM DEPLOY
     - task: Bash@3
-      displayName: "Deploy with Helm"
+      displayName: "Deploy Helm Chart"
       inputs:
         targetType: inline
         script: |
-          echo "Deploying backend:$BACKEND_TAG and frontend:$FRONTEND_TAG"
-          echo "Backend static IP: $STATIC_IP"
+          CHART=$(Pipeline.Workspace)/deploy_artifacts/*.tgz
+          helm upgrade --install todo-app $CHART \
+            --set backend.image=$REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/backend:$(BACKEND_TAG) \
+            --set frontend.image=$REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/frontend:$(FRONTEND_TAG) \
+            --set backend.staticIP=$(STATIC_IP)
 
-          helm upgrade --install todo-app $(Pipeline.Workspace)/deploy_artifacts/*.tgz \
-            --set backend.image=$REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/backend:$BACKEND_TAG \
-            --set frontend.image=$REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/frontend:$FRONTEND_TAG \
-            --set backend.staticIP=$STATIC_IP
+          echo "Deployment completed!"
 
-          echo "Helm deployment completed."
-
-    # 5️⃣ Verify deployment
+    # 8️⃣ VERIFY
     - task: Bash@3
-      displayName: "Verify deployment"
+      displayName: "Verify Deployment"
       inputs:
         targetType: inline
         script: |
