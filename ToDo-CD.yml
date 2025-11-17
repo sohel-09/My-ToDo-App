@@ -370,7 +370,10 @@ stages:
         script: |
           cd $(Pipeline.Workspace)/CI/deploy_artifacts/terraform
           terraform init
-          terraform apply -auto-approve
+          terraform apply -auto-approve \
+          -var="project_id=$(PROJECT_ID)" \
+          -var="region=$(REGION)" \
+          -var="zone=$(CLUSTER_ZONE)"
 
     # 6️⃣ INSTALL HELM
     - task: HelmInstaller@1
