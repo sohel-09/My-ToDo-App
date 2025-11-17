@@ -95,4 +95,6 @@ docker push asia-south1-docker.pkg.dev/fluted-factor-438905-d2/todo-repo/fronten
 
 kubectl get pods -o wide
 
-kubectl get svc
+kubectl get svc    
+
+....
