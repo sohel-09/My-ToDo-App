@@ -370,12 +370,13 @@ stages:
         script: |
           cd $(Pipeline.Workspace)/CI/deploy_artifacts/terraform
           terraform init
+          BASE64_KEY=$(base64 -w 0 "$(GCloudKey.secureFilePath)")
           terraform apply -auto-approve \
           -var="project_id=$(PROJECT_ID)" \
           -var="region=$(REGION)" \
           -var="zone=$(CLUSTER_ZONE)"
-          -var="gcp_credentials=$(cat $(GCloudKey.secureFilePath))"
-
+          -var="gcp_credentials=$BASE64_KEY"
+          
     # 6️⃣ INSTALL HELM
     - task: HelmInstaller@1
       inputs:
