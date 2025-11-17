@@ -145,15 +145,44 @@ stages:
           echo "✅ Successfully pushed Docker images for Build ID: $(Build.BuildId)"
 
     # 5️⃣ Publish build metadata (for CD pipeline)
+    # - task: Bash@3
+    #   displayName: "Export Build Metadata"
+    #   inputs:
+    #     targetType: inline
+    #     script: |
+    #       echo "BUILD_ID=$(Build.BuildId)" >> $(Pipeline.Workspace)/build_metadata.txt
+    #       echo "PROJECT_ID=$(PROJECT_ID)" >> $(Pipeline.Workspace)/build_metadata.txt
+    #       echo "REGION=$(REGION)" >> $(Pipeline.Workspace)/build_metadata.txt
+    #       echo "REPO_NAME=$(REPO_NAME)" >> $(Pipeline.Workspace)/build_metadata.txt
+
+    # 5️⃣ PACKAGE HELM CHART & COLLECT DEPLOYMENT ARTIFACTS
+    # ========================================================
     - task: Bash@3
-      displayName: "Export Build Metadata"
+      displayName: "Package Helm Chart"
       inputs:
         targetType: inline
         script: |
-          echo "BUILD_ID=$(Build.BuildId)" >> $(Pipeline.Workspace)/build_metadata.txt
-          echo "PROJECT_ID=$(PROJECT_ID)" >> $(Pipeline.Workspace)/build_metadata.txt
-          echo "REGION=$(REGION)" >> $(Pipeline.Workspace)/build_metadata.txt
-          echo "REPO_NAME=$(REPO_NAME)" >> $(Pipeline.Workspace)/build_metadata.txt
+          echo "Packaging Helm chart..."
+          mkdir -p $(Pipeline.Workspace)/deploy_artifacts
+
+          helm lint ./helm
+          helm package ./helm --destination $(Pipeline.Workspace)/deploy_artifacts
+
+          cp -r terraform $(Pipeline.Workspace)/deploy_artifacts/terraform
+          cp helm/values.yaml $(Pipeline.Workspace)/deploy_artifacts/values.yaml
+
+          # Extract static IP from values.yaml for CD stage
+          STATIC_IP=$(grep staticIP -A 1 helm/values.yaml | awk '{print $2}' | tr -d '"')
+          echo "STATIC_IP=$STATIC_IP" >> $(Pipeline.Workspace)/deploy_artifacts/deploy_info.txt
+
+          # Save image tags
+          echo "FRONTEND_TAG=$(Build.BuildId)" >> $(Pipeline.Workspace)/deploy_artifacts/deploy_info.txt
+          echo "BACKEND_TAG=$(Build.BuildId)" >> $(Pipeline.Workspace)/deploy_artifacts/deploy_info.txt
+          echo "PROJECT_ID=$PROJECT_ID" >> $(Pipeline.Workspace)/deploy_artifacts/deploy_info.txt
+          echo "REGION=$REGION" >> $(Pipeline.Workspace)/deploy_artifacts/deploy_info.txt
+          echo "REPO_NAME=$REPO_NAME" >> $(Pipeline.Workspace)/deploy_artifacts/deploy_info.txt
+
+          echo "Artifacts packaged."
     - publish: $(Pipeline.Workspace)/build_metadata.txt
       artifact: build-info
       displayName: "Publish build metadata artifact"

@@ -177,6 +177,104 @@
 # 🚀  CD Pipeline – Terraform + Helm Deployment
 # ============================================
 
+# trigger: none
+
+# resources:
+#   pipelines:
+#   - pipeline: CI
+#     source: ToDo-CI
+#     trigger:
+#       branches:
+#         - main
+
+# pool:
+#   vmImage: ubuntu-latest
+
+# variables:
+#   PROJECT_ID: 'fluted-factor-438905-d2'
+#   REGION: 'asia-south1'
+#   REPO_NAME: 'todo-repo'
+#   CLUSTER_NAME: 'todo-cluster'
+#   CLUSTER_ZONE: 'asia-south1-a'
+#   SERVICE_ACCOUNT: 'todo-deployer@fluted-factor-438905-d2.iam.gserviceaccount.com'
+
+# stages:
+# - stage: Deploy
+#   displayName: Deploy with Terraform & Helm
+#   jobs:
+#   - job: DeployToGKE
+#     displayName: "Terraform Apply & Helm Deploy"
+#     steps:
+#     - checkout: self
+
+#     # Download GCP Service Account Key
+#     - task: DownloadSecureFile@1
+#       name: GCloudKey
+#       inputs:
+#         secureFile: 'key.json'
+
+#     # Authenticate to Google Cloud & Get Cluster Credentials
+#     - task: Bash@3
+#       displayName: 'Authenticate to GCP'
+#       inputs:
+#         targetType: 'inline'
+#         script: |
+#           echo "Authenticating to GCP..."
+#           gcloud auth activate-service-account $SERVICE_ACCOUNT --key-file "$(GCloudKey.secureFilePath)"
+#           gcloud config set project $PROJECT_ID
+#           gcloud components install gke-gcloud-auth-plugin
+#           export USE_GKE_GCLOUD_AUTH_PLUGIN=True
+#           gcloud container clusters get-credentials $CLUSTER_NAME --zone $CLUSTER_ZONE --project $PROJECT_ID
+#       env:
+#         PROJECT_ID: $(PROJECT_ID)
+#         CLUSTER_NAME: $(CLUSTER_NAME)
+#         CLUSTER_ZONE: $(CLUSTER_ZONE)
+#         SERVICE_ACCOUNT: $(SERVICE_ACCOUNT)
+
+#     # Terraform Apply (Infra)
+#     - task: Bash@3
+#       displayName: 'Terraform Apply (GKE + IP + GAR)'
+#       inputs:
+#         targetType: 'inline'
+#         script: |
+#           cd terraform
+#           terraform init
+#           terraform apply -auto-approve
+#           cd ..
+
+#     # Install Helm
+#     - task: HelmInstaller@1
+#       inputs:
+#         helmVersionToInstall: '3.14.0'
+
+#     # Helm Deploy Application
+#     - task: Bash@3
+#       displayName: 'Deploy Helm Chart to GKE'
+#       inputs:
+#         targetType: 'inline'
+#         script: |
+#           set -e
+#           BUILD_ID=$(resources.pipeline.CI.runID)
+#           echo "Deploying images tagged with Build ID: $BUILD_ID"
+
+#           helm upgrade --install todo-app ./helm \
+#             --set backend.image=$REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/backend:$BUILD_ID \
+#             --set frontend.image=$REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/frontend:$BUILD_ID \
+#             --set mysql.rootPassword=myStrongPassword123
+
+#           echo " Helm deployment completed successfully!"
+
+#     #  (Optional) Verify Deployment
+#     - task: Bash@3
+#       displayName: "Verify Deployed Pods & Services"
+#       inputs:
+#         targetType: 'inline'
+#         script: |
+#           echo "Current pods:"
+#           kubectl get pods -o wide
+#           echo "Current services:"
+#           kubectl get svc -o wide
+
 trigger: none
 
 resources:
@@ -200,77 +298,95 @@ variables:
 
 stages:
 - stage: Deploy
-  displayName: Deploy with Terraform & Helm
+  displayName: Deploy using Terraform & Helm
   jobs:
   - job: DeployToGKE
-    displayName: "Terraform Apply & Helm Deploy"
+    displayName: Apply Infra + Deploy App
     steps:
     - checkout: self
 
-    # Download GCP Service Account Key
+    # ============================
+    # 1️⃣ Download CI artifacts
+    # ============================
+    - download: CI
+      artifact: deploy_artifacts
+    - task: Bash@3
+      displayName: "Extract Deployment Metadata"
+      inputs:
+        targetType: inline
+        script: |
+          echo "Extracting deploy_info.txt..."
+          cat $(Pipeline.Workspace)/deploy_artifacts/deploy_info.txt
+
+          export STATIC_IP=$(grep STATIC_IP $(Pipeline.Workspace)/deploy_artifacts/deploy_info.txt | cut -d'=' -f2)
+          export FRONTEND_TAG=$(grep FRONTEND_TAG $(Pipeline.Workspace)/deploy_artifacts/deploy_info.txt | cut -d'=' -f2)
+          export BACKEND_TAG=$(grep BACKEND_TAG $(Pipeline.Workspace)/deploy_artifacts/deploy_info.txt | cut -d'=' -f2)
+          echo "STATIC_IP=$STATIC_IP"
+          echo "FRONTEND_TAG=$FRONTEND_TAG"
+          echo "BACKEND_TAG=$BACKEND_TAG"
+
+          echo "##vso[task.setvariable variable=STATIC_IP]$STATIC_IP"
+          echo "##vso[task.setvariable variable=FRONTEND_TAG]$FRONTEND_TAG"
+          echo "##vso[task.setvariable variable=BACKEND_TAG]$BACKEND_TAG"
+
+    # ============================
+    # 2️⃣ Authenticate to GCP
+    # ============================
     - task: DownloadSecureFile@1
       name: GCloudKey
       inputs:
         secureFile: 'key.json'
 
-    # Authenticate to Google Cloud & Get Cluster Credentials
     - task: Bash@3
-      displayName: 'Authenticate to GCP'
+      displayName: "Authenticate to GCP & Connect to GKE"
       inputs:
-        targetType: 'inline'
+        targetType: inline
         script: |
-          echo "Authenticating to GCP..."
           gcloud auth activate-service-account $SERVICE_ACCOUNT --key-file "$(GCloudKey.secureFilePath)"
           gcloud config set project $PROJECT_ID
           gcloud components install gke-gcloud-auth-plugin
           export USE_GKE_GCLOUD_AUTH_PLUGIN=True
           gcloud container clusters get-credentials $CLUSTER_NAME --zone $CLUSTER_ZONE --project $PROJECT_ID
-      env:
-        PROJECT_ID: $(PROJECT_ID)
-        CLUSTER_NAME: $(CLUSTER_NAME)
-        CLUSTER_ZONE: $(CLUSTER_ZONE)
-        SERVICE_ACCOUNT: $(SERVICE_ACCOUNT)
 
-    # Terraform Apply (Infra)
+    # ============================
+    # 3️⃣ Terraform — Apply Infrastructure
+    # ============================
     - task: Bash@3
-      displayName: 'Terraform Apply (GKE + IP + GAR)'
+      displayName: "Terraform Apply"
       inputs:
-        targetType: 'inline'
+        targetType: inline
         script: |
-          cd terraform
+          cd $(Pipeline.Workspace)/deploy_artifacts/terraform
           terraform init
           terraform apply -auto-approve
-          cd ..
 
-    # Install Helm
+    # ============================
+    # 4️⃣ Helm Deployment
+    # ============================
     - task: HelmInstaller@1
       inputs:
         helmVersionToInstall: '3.14.0'
 
-    # Helm Deploy Application
     - task: Bash@3
-      displayName: 'Deploy Helm Chart to GKE'
+      displayName: "Deploy with Helm"
       inputs:
-        targetType: 'inline'
+        targetType: inline
         script: |
-          set -e
-          BUILD_ID=$(resources.pipeline.CI.runID)
-          echo "Deploying images tagged with Build ID: $BUILD_ID"
+          echo "Deploying backend:$BACKEND_TAG and frontend:$FRONTEND_TAG"
+          echo "Backend static IP: $STATIC_IP"
 
-          helm upgrade --install todo-app ./helm \
-            --set backend.image=$REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/backend:$BUILD_ID \
-            --set frontend.image=$REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/frontend:$BUILD_ID \
-            --set mysql.rootPassword=myStrongPassword123
+          helm upgrade --install todo-app $(Pipeline.Workspace)/deploy_artifacts/*.tgz \
+            --set backend.image=$REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/backend:$BACKEND_TAG \
+            --set frontend.image=$REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/frontend:$FRONTEND_TAG \
+            --set backend.staticIP=$STATIC_IP
 
-          echo " Helm deployment completed successfully!"
+          echo "Helm deployment completed."
 
-    #  (Optional) Verify Deployment
+    # 5️⃣ Verify deployment
     - task: Bash@3
-      displayName: "Verify Deployed Pods & Services"
+      displayName: "Verify deployment"
       inputs:
-        targetType: 'inline'
+        targetType: inline
         script: |
-          echo "Current pods:"
           kubectl get pods -o wide
-          echo "Current services:"
           kubectl get svc -o wide
