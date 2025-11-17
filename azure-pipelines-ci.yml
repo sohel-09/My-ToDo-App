@@ -73,11 +73,101 @@
 #       artifact: k8s-manifests
 #       displayName: 'Publish Kubernetes manifests as artifacts'
 
-trigger:
-  branches:
-    include:
-      - main
-      - feature/*
+# trigger:
+#   branches:
+#     include:
+#       - main
+#       - feature/*
+
+# pool:
+#   vmImage: ubuntu-latest
+
+# variables:
+#   PROJECT_ID: 'fluted-factor-438905-d2'
+#   REGION: 'asia-south1'
+#   REPO_NAME: 'todo-repo'
+#   SERVICE_ACCOUNT: 'todo-deployer@fluted-factor-438905-d2.iam.gserviceaccount.com'
+
+# stages:
+# # ---------- Stage 1: Build and Push ----------
+# - stage: Build
+#   displayName: Build and Push Docker Images
+#   jobs:
+#   - job: BuildAndPush
+#     displayName: Build & Push to Google Artifact Registry
+#     steps:
+#     - checkout: self
+
+#     # 1️⃣ Download Secure File (GCP Service Account JSON)
+#     - task: DownloadSecureFile@1
+#       name: GCloudKey
+#       inputs:
+#         secureFile: 'key.json'
+
+#     # 2️⃣ Authenticate to Google Cloud
+#     - task: Bash@3
+#       displayName: 'Authenticate to Google Artifact Registry'
+#       inputs:
+#         targetType: 'inline'
+#         script: |
+#           echo "Authenticating with Google Cloud..."
+#           gcloud auth activate-service-account $SERVICE_ACCOUNT --key-file "$(GCloudKey.secureFilePath)"
+#           gcloud config set project $PROJECT_ID
+#           gcloud auth configure-docker $REGION-docker.pkg.dev --quiet
+#       env:
+#         PROJECT_ID: $(PROJECT_ID)
+#         REGION: $(REGION)
+#         SERVICE_ACCOUNT: $(SERVICE_ACCOUNT)
+
+#     # 3️⃣ Build Docker Images
+#     - task: Bash@3
+#       displayName: 'Build Docker Images'
+#       inputs:
+#         targetType: 'inline'
+#         script: |
+#           echo "Building Docker images for frontend and backend..."
+#           docker build -t frontend:$(Build.BuildId) ./frontend
+#           docker build -t backend:$(Build.BuildId) ./backend
+
+#     # 4️⃣ Push Docker Images to Google Artifact Registry
+#     - task: Bash@3
+#       displayName: 'Push to Google Artifact Registry'
+#       inputs:
+#         targetType: 'inline'
+#         script: |
+#           echo "Tagging and pushing images to Artifact Registry..."
+#           docker tag frontend:$(Build.BuildId) $REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/frontend:$(Build.BuildId)
+#           docker tag backend:$(Build.BuildId) $REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/backend:$(Build.BuildId)
+
+#           docker push $REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/frontend:$(Build.BuildId)
+#           docker push $REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/backend:$(Build.BuildId)
+
+#           echo "✅ Successfully pushed Docker images for Build ID: $(Build.BuildId)"
+
+#     # 5️⃣ Publish build metadata (for CD pipeline)
+#     - task: Bash@3
+#       displayName: "Export Build Metadata"
+#       inputs:
+#         targetType: inline
+#         script: |
+#           echo "BUILD_ID=$(Build.BuildId)" >> $(Pipeline.Workspace)/build_metadata.txt
+#           echo "PROJECT_ID=$(PROJECT_ID)" >> $(Pipeline.Workspace)/build_metadata.txt
+#           echo "REGION=$(REGION)" >> $(Pipeline.Workspace)/build_metadata.txt
+#           echo "REPO_NAME=$(REPO_NAME)" >> $(Pipeline.Workspace)/build_metadata.txt
+
+#     - publish: $(Pipeline.Workspace)/build_metadata.txt
+#       artifact: build-info
+#       displayName: "Publish build metadata artifact"
+
+trigger: none
+
+resources:
+  pipelines:
+  - pipeline: CI
+    source: ToDo-CI
+    trigger:
+      branches:
+        - main
 
 pool:
   vmImage: ubuntu-latest
@@ -86,104 +176,103 @@ variables:
   PROJECT_ID: 'fluted-factor-438905-d2'
   REGION: 'asia-south1'
   REPO_NAME: 'todo-repo'
+  CLUSTER_NAME: 'todo-cluster'
+  CLUSTER_ZONE: 'asia-south1-a'
   SERVICE_ACCOUNT: 'todo-deployer@fluted-factor-438905-d2.iam.gserviceaccount.com'
 
 stages:
-# ---------- Stage 1: Build and Push ----------
-- stage: Build
-  displayName: Build and Push Docker Images
+- stage: Deploy
+  displayName: Deploy using Terraform & Helm
   jobs:
-  - job: BuildAndPush
-    displayName: Build & Push to Google Artifact Registry
+  - job: DeployToGKE
+    displayName: Apply Infra + Deploy App
     steps:
     - checkout: self
 
-    # 1️⃣ Download Secure File (GCP Service Account JSON)
+    # ============================
+    # 1️⃣ Download CI artifacts
+    # ============================
+    - download: CI
+      artifact: deploy_artifacts
+    - task: Bash@3
+      displayName: "Extract Deployment Metadata"
+      inputs:
+        targetType: inline
+        script: |
+          echo "Extracting deploy_info.txt..."
+          cat $(Pipeline.Workspace)/deploy_artifacts/deploy_info.txt
+
+          export STATIC_IP=$(grep STATIC_IP $(Pipeline.Workspace)/deploy_artifacts/deploy_info.txt | cut -d'=' -f2)
+          export FRONTEND_TAG=$(grep FRONTEND_TAG $(Pipeline.Workspace)/deploy_artifacts/deploy_info.txt | cut -d'=' -f2)
+          export BACKEND_TAG=$(grep BACKEND_TAG $(Pipeline.Workspace)/deploy_artifacts/deploy_info.txt | cut -d'=' -f2)
+          echo "STATIC_IP=$STATIC_IP"
+          echo "FRONTEND_TAG=$FRONTEND_TAG"
+          echo "BACKEND_TAG=$BACKEND_TAG"
+
+          echo "##vso[task.setvariable variable=STATIC_IP]$STATIC_IP"
+          echo "##vso[task.setvariable variable=FRONTEND_TAG]$FRONTEND_TAG"
+          echo "##vso[task.setvariable variable=BACKEND_TAG]$BACKEND_TAG"
+
+    # ============================
+    # 2️⃣ Authenticate to GCP
+    # ============================
     - task: DownloadSecureFile@1
       name: GCloudKey
       inputs:
         secureFile: 'key.json'
 
-    # 2️⃣ Authenticate to Google Cloud
     - task: Bash@3
-      displayName: 'Authenticate to Google Artifact Registry'
-      inputs:
-        targetType: 'inline'
-        script: |
-          echo "Authenticating with Google Cloud..."
-          gcloud auth activate-service-account $SERVICE_ACCOUNT --key-file "$(GCloudKey.secureFilePath)"
-          gcloud config set project $PROJECT_ID
-          gcloud auth configure-docker $REGION-docker.pkg.dev --quiet
-      env:
-        PROJECT_ID: $(PROJECT_ID)
-        REGION: $(REGION)
-        SERVICE_ACCOUNT: $(SERVICE_ACCOUNT)
-
-    # 3️⃣ Build Docker Images
-    - task: Bash@3
-      displayName: 'Build Docker Images'
-      inputs:
-        targetType: 'inline'
-        script: |
-          echo "Building Docker images for frontend and backend..."
-          docker build -t frontend:$(Build.BuildId) ./frontend
-          docker build -t backend:$(Build.BuildId) ./backend
-
-    # 4️⃣ Push Docker Images to Google Artifact Registry
-    - task: Bash@3
-      displayName: 'Push to Google Artifact Registry'
-      inputs:
-        targetType: 'inline'
-        script: |
-          echo "Tagging and pushing images to Artifact Registry..."
-          docker tag frontend:$(Build.BuildId) $REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/frontend:$(Build.BuildId)
-          docker tag backend:$(Build.BuildId) $REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/backend:$(Build.BuildId)
-
-          docker push $REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/frontend:$(Build.BuildId)
-          docker push $REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/backend:$(Build.BuildId)
-
-          echo "✅ Successfully pushed Docker images for Build ID: $(Build.BuildId)"
-
-    # 5️⃣ Publish build metadata (for CD pipeline)
-    # - task: Bash@3
-    #   displayName: "Export Build Metadata"
-    #   inputs:
-    #     targetType: inline
-    #     script: |
-    #       echo "BUILD_ID=$(Build.BuildId)" >> $(Pipeline.Workspace)/build_metadata.txt
-    #       echo "PROJECT_ID=$(PROJECT_ID)" >> $(Pipeline.Workspace)/build_metadata.txt
-    #       echo "REGION=$(REGION)" >> $(Pipeline.Workspace)/build_metadata.txt
-    #       echo "REPO_NAME=$(REPO_NAME)" >> $(Pipeline.Workspace)/build_metadata.txt
-
-    # 5️⃣ PACKAGE HELM CHART & COLLECT DEPLOYMENT ARTIFACTS
-    # ========================================================
-    - task: Bash@3
-      displayName: "Package Helm Chart"
+      displayName: "Authenticate to GCP & Connect to GKE"
       inputs:
         targetType: inline
         script: |
-          echo "Packaging Helm chart..."
-          mkdir -p $(Pipeline.Workspace)/deploy_artifacts
+          gcloud auth activate-service-account $SERVICE_ACCOUNT --key-file "$(GCloudKey.secureFilePath)"
+          gcloud config set project $PROJECT_ID
+          gcloud components install gke-gcloud-auth-plugin
+          export USE_GKE_GCLOUD_AUTH_PLUGIN=True
+          gcloud container clusters get-credentials $CLUSTER_NAME --zone $CLUSTER_ZONE --project $PROJECT_ID
 
-          helm lint ./helm
-          helm package ./helm --destination $(Pipeline.Workspace)/deploy_artifacts
+    # ============================
+    # 3️⃣ Terraform — Apply Infrastructure
+    # ============================
+    - task: Bash@3
+      displayName: "Terraform Apply"
+      inputs:
+        targetType: inline
+        script: |
+          cd $(Pipeline.Workspace)/deploy_artifacts/terraform
+          terraform init
+          terraform apply -auto-approve
 
-          cp -r terraform $(Pipeline.Workspace)/deploy_artifacts/terraform
-          cp helm/values.yaml $(Pipeline.Workspace)/deploy_artifacts/values.yaml
+    # ============================
+    # 4️⃣ Helm Deployment
+    # ============================
+    - task: HelmInstaller@1
+      inputs:
+        helmVersionToInstall: '3.14.0'
 
-          # Extract static IP from values.yaml for CD stage
-          STATIC_IP=$(grep staticIP -A 1 helm/values.yaml | awk '{print $2}' | tr -d '"')
-          echo "STATIC_IP=$STATIC_IP" >> $(Pipeline.Workspace)/deploy_artifacts/deploy_info.txt
+    - task: Bash@3
+      displayName: "Deploy with Helm"
+      inputs:
+        targetType: inline
+        script: |
+          echo "Deploying backend:$BACKEND_TAG and frontend:$FRONTEND_TAG"
+          echo "Backend static IP: $STATIC_IP"
 
-          # Save image tags
-          echo "FRONTEND_TAG=$(Build.BuildId)" >> $(Pipeline.Workspace)/deploy_artifacts/deploy_info.txt
-          echo "BACKEND_TAG=$(Build.BuildId)" >> $(Pipeline.Workspace)/deploy_artifacts/deploy_info.txt
-          echo "PROJECT_ID=$PROJECT_ID" >> $(Pipeline.Workspace)/deploy_artifacts/deploy_info.txt
-          echo "REGION=$REGION" >> $(Pipeline.Workspace)/deploy_artifacts/deploy_info.txt
-          echo "REPO_NAME=$REPO_NAME" >> $(Pipeline.Workspace)/deploy_artifacts/deploy_info.txt
+          helm upgrade --install todo-app $(Pipeline.Workspace)/deploy_artifacts/*.tgz \
+            --set backend.image=$REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/backend:$BACKEND_TAG \
+            --set frontend.image=$REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/frontend:$FRONTEND_TAG \
+            --set backend.staticIP=$STATIC_IP
 
-          echo "Artifacts packaged."
-    - publish: $(Pipeline.Workspace)/build_metadata.txt
-      artifact: build-info
-      displayName: "Publish build metadata artifact"
+          echo "Helm deployment completed."
 
+    # ============================
+    # 5️⃣ Verify deployment
+    # ============================
+    - task: Bash@3
+      displayName: "Verify deployment"
+      inputs:
+        targetType: inline
+        script: |
+          kubectl get pods -o wide
+          kubectl get svc -o wide
