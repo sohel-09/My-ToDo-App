@@ -356,17 +356,11 @@ stages:
           gcloud container clusters get-credentials $CLUSTER_NAME --zone $CLUSTER_ZONE
 
     # 4️⃣ INSTALL TERRAFORM
-    - task: Bash@3
+    - task: TerraformInstaller@1
       displayName: "Install Terraform"
       inputs:
-        targetType: inline
-        script: |
-          sudo apt-get update -y
-          sudo apt-get install -y wget unzip
-          wget https://releases.hashicorp.com/terraform/1.6.0/terraform_1.6.0_linux_amd64.zip
-          unzip terraform_1.6.0_linux_amd64.zip
-          sudo mv terraform /usr/local/bin/
-          terraform -version
+        terraformVersion: '1.6.0'
+
 
     # 5️⃣ TERRAFORM APPLY
     - task: Bash@3
