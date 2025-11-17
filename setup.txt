@@ -66,3 +66,33 @@ gcloud compute firewall-rules create allow-backend-5000 --allow tcp:5000 --targe
 kubectl create secret generic mysql-secret --from-literal=mysql-root-password=root
 
 kubectl create configmap backend-config --from-literal=DB_HOST=mysql-service --from-literal=DB_USER=root --from-literal=DB_NAME=todo --from-literal=DB_PORT=3306 --from-literal=PORT=3000 --from-literal=ALLOWED_ORIGIN=*
+
+helm upgrade --install todo-app ./helm --set frontend.service.loadBalancerIP=34.100.154.97 --set backend.service.loadBalancerIP=34.14.153.17 --set backend.image=asia-south1-docker.pkg.dev/fluted-factor-438905-d2/todo-repo/backend:latest --set frontend.image=asia-south1-docker.pkg.dev/fluted-factor-438905-d2/todo-repo/frontend:latest --set mysql.rootPassword=myStrongPassword123
+
+kubectl delete svc todo-app-frontend-service todo-app-backend-service
+
+gcloud container node-pools describe todo-nodes --cluster=todo-cluster --zone=asia-south1-a --format="value(config.serviceAccount)"
+
+kubectl create configmap backend-config --from-literal=DB_HOST=todo-app-mysql-service --from-literal=DB_USER=root --from-literal=DB_NAME=todo --from-literal=DB_PORT=3306 --from-literal=PORT=3000 --from-literal=ALLOWED_ORIGIN="*"
+
+
+
+# Authenticate with GAR
+gcloud auth configure-docker asia-south1-docker.pkg.dev
+
+# Build and push backend
+docker build -t asia-south1-docker.pkg.dev/fluted-factor-438905-d2/todo-repo/backend:latest ./backend
+docker push asia-south1-docker.pkg.dev/fluted-factor-438905-d2/todo-repo/backend:latest
+
+# Build and push frontend
+docker build -t asia-south1-docker.pkg.dev/fluted-factor-438905-d2/todo-repo/frontend:latest ./frontend
+docker push asia-south1-docker.pkg.dev/fluted-factor-438905-d2/todo-repo/frontend:latest
+
+ kubectl create secret generic mysql-secret --from-literal=mysql-root-password=myStrongPassword123 --from-literal=mysql-user=todo_user --from-literal=mysql-password=todo_pass
+
+ gcloud artifacts docker images list asia-south1-docker.pkg.dev/fluted-factor-438905-d2/todo-repo/backend --include-tags
+
+
+kubectl get pods -o wide
+
+kubectl get svc

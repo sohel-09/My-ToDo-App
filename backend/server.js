@@ -64,5 +64,5 @@ app.get("/todos", (req, res) => {
 });
 
 // Use port 3000 to match Kubernetes configuration
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || (3000, '0.0.0.0');
 app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));

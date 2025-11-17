@@ -1,0 +1,198 @@
+# apiVersion: apps/v1
+# kind: StatefulSet
+# metadata:
+#   name: {{ .Chart.Name }}-mysql
+#   labels:
+#     app: {{ .Chart.Name }}
+#     component: mysql
+# spec:
+#   serviceName: {{ .Chart.Name }}-mysql-service
+#   replicas: {{ .Values.mysql.replicas | default 1 }}
+#   selector:
+#     matchLabels:
+#       app: {{ .Chart.Name }}
+#       component: mysql
+#   template:
+#     metadata:
+#       labels:
+#         app: {{ .Chart.Name }}
+#         component: mysql
+#     spec:
+#       containers:
+#         - name: mysql
+#           image: {{ .Values.mysql.image | default "mysql:8.0" }}
+#           ports:
+#             - containerPort: {{ .Values.mysql.port | default 3306 }}
+#           env:
+#             - name: MYSQL_USER
+#               valueFrom:
+#                 secretKeyRef:
+#                   name: {{ .Values.mysql.secretName | default "mysql-secret" }}
+#                   key: {{ .Values.mysql.userKey | default "mysql-user" }}
+#             - name: MYSQL_PASSWORD
+#               valueFrom:
+#                 secretKeyRef:
+#                   name: {{ .Values.mysql.secretName | default "mysql-secret" }}
+#                   key: {{ .Values.mysql.passwordKey | default "mysql-password" }}
+
+#             - name: MYSQL_ROOT_PASSWORD
+#               valueFrom:
+#                 secretKeyRef:
+#                   name: {{ .Values.mysql.secretName | default "mysql-secret" }}
+#                   key: {{ .Values.mysql.passwordKey | default "mysql-root-password" }}
+#             - name: MYSQL_DATABASE
+#               value: {{ .Values.mysql.database | default "todo" | quote }}
+#           resources:
+#             requests:
+#               cpu: {{ .Values.mysql.resources.requests.cpu | default "100m" | quote }}
+#               memory: {{ .Values.mysql.resources.requests.memory | default "256Mi" | quote }}
+#             limits:
+#               cpu: {{ .Values.mysql.resources.limits.cpu | default "300m" | quote }}
+#               memory: {{ .Values.mysql.resources.limits.memory | default "512Mi" | quote }}
+#           readinessProbe:
+#             exec:
+#               command: ["mysqladmin", "ping", "-h", "localhost"]
+#             initialDelaySeconds: {{ .Values.mysql.readinessProbe.initialDelaySeconds | default 10 }}
+#             periodSeconds: {{ .Values.mysql.readinessProbe.periodSeconds | default 10 }}
+#           livenessProbe:
+#             exec:
+#               command: ["mysqladmin", "ping", "-h", "localhost"]
+#             initialDelaySeconds: {{ .Values.mysql.livenessProbe.initialDelaySeconds | default 20 }}
+#             periodSeconds: {{ .Values.mysql.livenessProbe.periodSeconds | default 20 }}
+
+#           volumeMounts:
+#             - name: mysql-persistent-storage
+#               mountPath: /var/lib/mysql
+#             - name: mysql-init
+#               mountPath: /docker-entrypoint-initdb.d/init.sql
+#               subPath: init.sql
+
+#   volumeClaimTemplates:
+#     - metadata:
+#         name: mysql-persistent-storage
+#       spec:
+#         accessModes: ["ReadWriteOnce"]
+#         resources:
+#           requests:
+#             storage: {{ .Values.mysql.storage.size | default "5Gi" }}
+# ---
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: {{ .Chart.Name }}-mysql-service
+#   labels:
+#     app: {{ .Chart.Name }}
+#     component: mysql
+# spec:
+#   type: ClusterIP
+#   selector:
+#     app: {{ .Chart.Name }}
+#     component: mysql
+#       volumes:
+#         - name: mysql-init
+#           configMap:
+#             name: {{ .Chart.Name }}-mysql-init-sql
+
+#   ports:
+#     - name: mysql
+#       port: {{ .Values.mysql.port | default 3306 }}
+#       targetPort: {{ .Values.mysql.port | default 3306 }}
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Chart.Name }}-mysql
+  labels:
+    app: {{ .Chart.Name }}
+    component: mysql
+spec:
+  serviceName: {{ .Chart.Name }}-mysql-service
+  replicas: {{ .Values.mysql.replicas | default 1 }}
+  selector:
+    matchLabels:
+      app: {{ .Chart.Name }}
+      component: mysql
+  template:
+    metadata:
+      labels:
+        app: {{ .Chart.Name }}
+        component: mysql
+    spec:
+      containers:
+        - name: mysql
+          image: {{ .Values.mysql.image | default "mysql:8.0" }}
+          ports:
+            - containerPort: {{ .Values.mysql.port | default 3306 }}
+          env:
+            - name: MYSQL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.mysql.secretName | default "mysql-secret" }}
+                  key: {{ .Values.mysql.userKey | default "mysql-user" }}
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.mysql.secretName | default "mysql-secret" }}
+                  key: {{ .Values.mysql.passwordKey | default "mysql-password" }}
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.mysql.secretName | default "mysql-secret" }}
+                  key: {{ .Values.mysql.rootPasswordKey | default "mysql-root-password" }}
+            - name: MYSQL_DATABASE
+              value: {{ .Values.mysql.database | default "todo" | quote }}
+          resources:
+            requests:
+              cpu: {{ .Values.mysql.resources.requests.cpu | default "100m" | quote }}
+              memory: {{ .Values.mysql.resources.requests.memory | default "256Mi" | quote }}
+            limits:
+              cpu: {{ .Values.mysql.resources.limits.cpu | default "300m" | quote }}
+              memory: {{ .Values.mysql.resources.limits.memory | default "512Mi" | quote }}
+          readinessProbe:
+            exec:
+              command: ["mysqladmin", "ping", "-h", "localhost"]
+            initialDelaySeconds: {{ .Values.mysql.readinessProbe.initialDelaySeconds | default 10 }}
+            periodSeconds: {{ .Values.mysql.readinessProbe.periodSeconds | default 10 }}
+          livenessProbe:
+            exec:
+              command: ["mysqladmin", "ping", "-h", "localhost"]
+            initialDelaySeconds: {{ .Values.mysql.livenessProbe.initialDelaySeconds | default 20 }}
+            periodSeconds: {{ .Values.mysql.livenessProbe.periodSeconds | default 20 }}
+          volumeMounts:
+            - name: mysql-persistent-storage
+              mountPath: /var/lib/mysql
+            - name: mysql-init
+              mountPath: /docker-entrypoint-initdb.d/init.sql
+              subPath: init.sql
+
+      # ✅ volumes must be defined here (inside pod spec, not in service)
+      volumes:
+        - name: mysql-init
+          configMap:
+            name: {{ .Chart.Name }}-mysql-init-sql
+
+  volumeClaimTemplates:
+    - metadata:
+        name: mysql-persistent-storage
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: {{ .Values.mysql.storage.size | default "5Gi" }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Chart.Name }}-mysql-service
+  labels:
+    app: {{ .Chart.Name }}
+    component: mysql
+spec:
+  type: ClusterIP
+  selector:
+    app: {{ .Chart.Name }}
+    component: mysql
+  ports:
+    - name: mysql
+      port: {{ .Values.mysql.port | default 3306 }}
+      targetPort: {{ .Values.mysql.port | default 3306 }}

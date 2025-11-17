@@ -15,3 +15,7 @@ build/
 # GCP service account key (sensitive)
 key.json
 *.txt
+
+*.tfstate
+*.tfstate.*
+terraform.tfstate

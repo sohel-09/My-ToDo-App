@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Chart.Name }}-frontend-config
+data:
+  config.js: |
+    window.BACKEND_URL="http://{{ .Values.backend.staticIP }}:3000";

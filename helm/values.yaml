@@ -1,0 +1,88 @@
+
+mysql:
+  image: "mysql:8.0"
+  replicas: 1
+  port: 3306
+  database: "todo"
+  secretName: "mysql-secret"
+  user: todo_user
+  password: todo_pass
+  rootPassword: myStrongPassword123
+
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "300m"
+      memory: "512Mi"
+
+  readinessProbe:
+    initialDelaySeconds: 10
+    periodSeconds: 10
+
+  livenessProbe:
+    initialDelaySeconds: 20
+    periodSeconds: 20
+
+  storage:
+    size: 5Gi
+
+  service:
+    type: ClusterIP
+    port: 3306
+
+
+backend:
+  image: "asia-south1-docker.pkg.dev/fluted-factor-438905-d2/todo-repo/backend:latest"
+  replicas: 1
+  containerPort: 3000
+  staticIP: "34.100.221.148"
+
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "300m"
+      memory: "256Mi"
+
+  readinessProbe:
+    initialDelaySeconds: 5
+    periodSeconds: 10
+
+  livenessProbe:
+    initialDelaySeconds: 15
+    periodSeconds: 20
+
+  service:
+    type: ClusterIP
+    port: 3000
+
+
+frontend:
+  image: "asia-south1-docker.pkg.dev/fluted-factor-438905-d2/todo-repo/frontend:latest"
+  imagePullPolicy: Always
+  replicas: 1
+  containerPort: 80
+
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "250m"
+      memory: "256Mi"
+
+  readinessProbe:
+    path: "/"
+    initialDelaySeconds: 5
+    periodSeconds: 10
+
+  service:
+    type: LoadBalancer
+    port: 80
+    sessionAffinity: None
+
+    annotations:
+      cloud.google.com/load-balancer-type: "External"

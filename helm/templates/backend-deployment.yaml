@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Chart.Name }}-backend
+  labels:
+    app: {{ .Chart.Name }}
+    component: backend
+spec:
+  replicas: {{ .Values.backend.replicas | default 1 }}
+  selector:
+    matchLabels:
+      app: {{ .Chart.Name }}
+      component: backend
+  template:
+    metadata:
+      labels:
+        app: {{ .Chart.Name }}
+        component: backend
+    spec:
+      containers:
+        - name: backend
+          image: {{ .Values.backend.image }}
+          imagePullPolicy: Always  
+          ports:
+            - containerPort: {{ .Values.backend.containerPort }}
+
+          env:
+            - name: DB_HOST
+              value: "{{ .Chart.Name }}-mysql-service"
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.mysql.secretName | default "mysql-secret" }}
+                  key: mysql-user
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.mysql.secretName | default "mysql-secret" }}
+                  key: mysql-password
+            - name: DB_NAME
+              value: {{ .Values.mysql.database | default "todo" | quote }}
+            - name: DB_PORT
+              value: "{{ .Values.mysql.port | default 3306 }}"
+
+          resources:
+            requests:
+              cpu: {{ .Values.backend.resources.requests.cpu | default "100m" | quote }}
+              memory: {{ .Values.backend.resources.requests.memory | default "128Mi" | quote }}
+            limits:
+              cpu: {{ .Values.backend.resources.limits.cpu | default "300m" | quote }}
+              memory: {{ .Values.backend.resources.limits.memory | default "256Mi" | quote }}
+          readinessProbe:
+            tcpSocket:
+              port: {{ .Values.backend.containerPort }}
+            initialDelaySeconds: {{ .Values.backend.readinessProbe.initialDelaySeconds | default 5 }}
+            periodSeconds: {{ .Values.backend.readinessProbe.periodSeconds | default 10 }}
+          livenessProbe:
+            tcpSocket:
+              port: {{ .Values.backend.containerPort }}
+            initialDelaySeconds: {{ .Values.backend.livenessProbe.initialDelaySeconds | default 15 }}
+            periodSeconds: {{ .Values.backend.livenessProbe.periodSeconds | default 20 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Chart.Name }}-backend    # ✔ FIXED SERVICE NAME
+  labels:
+    app: {{ .Chart.Name }}
+    component: backend
+spec:
+  type: ClusterIP
+  selector:
+    app: {{ .Chart.Name }}
+    component: backend
+  ports:
+    - name: http
+      port: {{ .Values.backend.service.port }}       # 3000
+      targetPort: {{ .Values.backend.containerPort }} # 3000

@@ -1,104 +1,3 @@
-# # CD PIPELINE 
-# # Triggered automatically when CI pipeline (ToDo-CI) completes successfully
-
-# trigger: none  
-
-# resources:
-#   pipelines:
-#   - pipeline: CI       
-#     source: ToDo-CI # <-- must match the CI pipeline name as seen in Azure DevOps
-#     trigger:
-#       branches:
-#         - main           # triggers CD only when CI on main completes
-
-# pool:
-#   vmImage: ubuntu-latest
-
-# variables:
-#   PROJECT_ID: 'fluted-factor-438905-d2'
-#   REGION: 'asia-south1'
-#   REPO_NAME: 'todo-repo'
-#   CLUSTER_NAME: 'todo-cluster'
-#   CLUSTER_ZONE: 'asia-south1-a'
-#   SERVICE_ACCOUNT: 'todo-deployer@fluted-factor-438905-d2.iam.gserviceaccount.com'
-
-# stages:
-# - stage: Deploy
-#   displayName: Deploy to GKE
-#   jobs:
-#   - deployment: DeployToGKE
-#     environment: 'production'
-#     strategy:
-#       runOnce:
-#         deploy:
-#           steps:
-#           - checkout: self
-
-#           # Download Secure File (GCP Service Account JSON)
-#           - task: DownloadSecureFile@1
-#             name: GCloudKey
-#             inputs:
-#               secureFile: 'key.json'   # stored in Secure Files
-
-#           # Authenticate with Google Cloud using secure key
-#           - task: Bash@3
-#             displayName: 'Authenticate with Google Cloud'
-#             inputs:
-#               targetType: 'inline'
-#               script: |
-#                 echo "Authenticating to GCP and configuring kubectl..."
-
-#                 # Activate service account
-#                 gcloud auth activate-service-account $SERVICE_ACCOUNT --key-file "$(GCloudKey.secureFilePath)"
-#                 gcloud config set project $PROJECT_ID
-
-#                 # Properly install GKE gcloud auth plugin (with repo setup)
-#                 echo "Installing GKE gcloud auth plugin..."
-#                 sudo apt-get update -y
-#                 sudo apt-get install -y apt-transport-https ca-certificates gnupg curl
-
-#                 echo "Adding Google Cloud SDK repository..."
-#                 echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
-#                 curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key --keyring /usr/share/keyrings/cloud.google.gpg add -
-#                 sudo apt-get update -y
-#                 sudo apt-get install -y google-cloud-sdk-gke-gcloud-auth-plugin
-
-#                 # -- Add plugin to PATH so kubectl can find it
-#                 export PATH=$PATH:/usr/lib/google-cloud-sdk/bin
-
-#                 # -- Set environment variable for kubectl authentication
-#                 export USE_GKE_GCLOUD_AUTH_PLUGIN=True
-
-#                 # -- Fetch cluster credentials
-#                 gcloud container clusters get-credentials $CLUSTER_NAME --zone $CLUSTER_ZONE --project $PROJECT_ID
-
-#                 # -- Verify plugin works
-#                 gke-gcloud-auth-plugin --version || echo "Plugin installed successfully!"
-#             env:
-#               PROJECT_ID: $(PROJECT_ID)
-#               CLUSTER_NAME: $(CLUSTER_NAME)
-#               CLUSTER_ZONE: $(CLUSTER_ZONE)
-#               SERVICE_ACCOUNT: $(SERVICE_ACCOUNT)
-
-
-#           # ✅ Deploy images to GKE
-#           - task: Bash@3
-#             displayName: 'Deploy to GKE'
-#             inputs:
-#               targetType: 'inline'
-#               script: |
-#                 export USE_GKE_GCLOUD_AUTH_PLUGIN=True
-#                 BUILD_ID=$(resources.pipeline.CI.runID)
-#                 echo "Deploying images tagged with Build ID: $BUILD_ID"
-#                 sed -i "s|IMAGE_FRONTEND|$REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/frontend:$BUILD_ID|g" k8s/frontend-deployment.yaml
-#                 sed -i "s|IMAGE_BACKEND|$REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/backend:$BUILD_ID|g" k8s/backend-deployment.yaml
-
-#                 kubectl apply -f k8s/ --validate=false
-#             env:
-#               REGION: $(REGION)
-#               PROJECT_ID: $(PROJECT_ID)
-#               REPO_NAME: $(REPO_NAME)
-
 #  CD PIPELINE
 
 trigger: none  
@@ -199,7 +98,62 @@ stages:
                   --from-literal=mysql-root-password=root \
                   --dry-run=client -o yaml | kubectl apply -f -
 
-                echo "✅ Secrets and ConfigMaps ensured successfully."
+                echo " Secrets and ConfigMaps ensured successfully."
+          # Step: Wait for MySQL Pod to be Ready
+          - task: Bash@3
+            displayName: 'Wait for MySQL Pod to be Ready'
+            inputs:
+              targetType: 'inline'
+              script: |
+                echo "Waiting for MySQL pod to become ready..."
+                kubectl wait --for=condition=ready pod -l app=mysql --timeout=300s
+                echo " MySQL pod is ready."
+
+          # Step: Auto-create Database and Table
+          - task: Bash@3
+            displayName: 'Wait until MySQL is accepting connections'
+            inputs:
+              targetType: 'inline'
+              script: |
+                MYSQL_POD=$(kubectl get pod -l app=mysql -o jsonpath="{.items[0].metadata.name}")
+                echo "Checking MySQL readiness inside pod: $MYSQL_POD"
+                
+                # Loop until MySQL responds
+                for i in {1..30}; do
+                  kubectl exec $MYSQL_POD -- mysqladmin ping -u root -proot --silent && break
+                  echo " Waiting for MySQL to be ready... ($i/30)"
+                  sleep 5
+                done
+
+                echo " MySQL is accepting connections now."
+
+          # Create database and table
+          - task: Bash@3
+            displayName: 'Initialize Database and Table'
+            inputs:
+              targetType: 'inline'
+              script: |
+                set -e
+                MYSQL_POD=mysql-0
+                
+                echo "Using MySQL pod: $MYSQL_POD"
+                MYSQL_ROOT_PASSWORD=myStrongPassword123
+                for i in {1..30}; do
+                   kubectl exec $MYSQL_POD -- mysqladmin ping -u root -p$MYSQL_ROOT_PASSWORD --silent && break
+                  echo " Waiting for MySQL to be ready... ($i/30)"
+                  sleep 5
+                done
+
+                echo " MySQL accepting connections, creating database..."
+                kubectl exec -i $MYSQL_POD -- mysql -h 127.0.0.1 -u root -p$MYSQL_ROOT_PASSWORD <<EOF
+                CREATE DATABASE IF NOT EXISTS todo;
+                USE todo;
+                CREATE TABLE IF NOT EXISTS tasks (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    title VARCHAR(255) NOT NULL
+                );
+                EOF
+                echo " Database and table initialization completed successfully."
 
           # Deploy images to GKE
           - task: Bash@3
@@ -218,51 +172,3 @@ stages:
               REGION: $(REGION)
               PROJECT_ID: $(PROJECT_ID)
               REPO_NAME: $(REPO_NAME)
-          # Step: Wait for MySQL Pod to be Ready
-          - task: Bash@3
-            displayName: 'Wait for MySQL Pod to be Ready'
-            inputs:
-              targetType: 'inline'
-              script: |
-                echo "Waiting for MySQL pod to become ready..."
-                kubectl wait --for=condition=ready pod -l app=mysql --timeout=300s
-                echo "✅ MySQL pod is ready."
-
-          # Step: Auto-create Database and Table
-          - task: Bash@3
-            displayName: 'Wait until MySQL is accepting connections'
-            inputs:
-              targetType: 'inline'
-              script: |
-                MYSQL_POD=$(kubectl get pod -l app=mysql -o jsonpath="{.items[0].metadata.name}")
-                echo "Checking MySQL readiness inside pod: $MYSQL_POD"
-                
-                # Loop until MySQL responds
-                for i in {1..30}; do
-                  kubectl exec $MYSQL_POD -- mysqladmin ping -u root -proot --silent && break
-                  echo "⏳ Waiting for MySQL to be ready... ($i/30)"
-                  sleep 5
-                done
-
-                echo "✅ MySQL is accepting connections now."
-
-          # ✅ Create database and table
-          - task: Bash@3
-            displayName: 'Initialize Database Schema (todo.tasks)'
-            inputs:
-              targetType: 'inline'
-              script: |
-                MYSQL_POD=$(kubectl get pod -l app=mysql -o jsonpath="{.items[0].metadata.name}")
-                echo "Running database initialization inside $MYSQL_POD..."
-
-                kubectl exec -i $MYSQL_POD -- mysql -u root -proot <<EOF
-                CREATE DATABASE IF NOT EXISTS todo;
-                USE todo;
-                CREATE TABLE IF NOT EXISTS tasks (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    title VARCHAR(255) NOT NULL
-                );
-                EOF
-
-                echo "✅ Database and table initialization completed successfully."
-
