@@ -408,7 +408,7 @@ stages:
       inputs:
         targetType: inline
         script: |
-          CHART=$(Pipeline.Workspace)/CI/deploy_artifacts/*.tgz
+          CHART=$(Pipeline.Workspace)/deploy_artifacts/*.tgz
 
           helm upgrade --install todo-app $CHART \
             --set backend.image=$REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/backend:$(BACKEND_TAG) \

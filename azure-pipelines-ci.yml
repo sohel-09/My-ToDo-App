@@ -228,9 +228,13 @@ stages:
 
           echo "Successfully pushed images."
 
-    # ========================================================
+      # installing helm     
+    - task: HelmInstaller@1
+      inputs:
+        helmVersionToInstall: '3.14.0'
+
     # 5️⃣ PACKAGE HELM CHART & COLLECT DEPLOYMENT ARTIFACTS
-    # ========================================================
+
     - task: Bash@3
       displayName: "Package Helm Chart"
       inputs:
@@ -257,11 +261,12 @@ stages:
           echo "REPO_NAME=$REPO_NAME" >> $(Pipeline.Workspace)/deploy_artifacts/deploy_info.txt
 
           echo "Artifacts packaged."
+          ls -R $(Pipeline.Workspace)/deploy_artifacts
 
     - publish: $(Pipeline.Workspace)/deploy_artifacts
       artifact: deploy_artifacts
       displayName: "Publish Helm + Terraform + Metadata"
-      
+
         # DEBUG: Inspect CI artifact paths
     - task: Bash@3
       displayName: "DEBUG: Show CI Paths"
