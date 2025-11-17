@@ -317,6 +317,24 @@ stages:
         script: |
           echo "Downloaded files:"
           ls -R $(Pipeline.Workspace)/deploy_artifacts
+    - task: Bash@3
+      displayName: "Extract deploy metadata"
+      inputs:
+        targetType: inline
+        script: |
+          FILE=$(Pipeline.Workspace)/CI/deploy_artifacts/deploy_info.txt
+
+          export STATIC_IP=$(grep STATIC_IP $FILE | cut -d'=' -f2)
+          export FRONTEND_TAG=$(grep FRONTEND_TAG $FILE | cut -d'=' -f2)
+          export BACKEND_TAG=$(grep BACKEND_TAG $FILE | cut -d'=' -f2)
+
+          echo "STATIC_IP=$STATIC_IP"
+          echo "FRONTEND_TAG=$FRONTEND_TAG"
+          echo "BACKEND_TAG=$BACKEND_TAG"
+
+          echo "##vso[task.setvariable variable=STATIC_IP]$STATIC_IP"
+          echo "##vso[task.setvariable variable=FRONTEND_TAG]$FRONTEND_TAG"
+          echo "##vso[task.setvariable variable=BACKEND_TAG]$BACKEND_TAG"
 
     # 2️⃣ PARSE deploy_info.txt
     - task: Bash@3
@@ -390,7 +408,8 @@ stages:
       inputs:
         targetType: inline
         script: |
-          CHART=$(Pipeline.Workspace)/deploy_artifacts/*.tgz
+          CHART=$(Pipeline.Workspace)/CI/deploy_artifacts/*.tgz
+
           helm upgrade --install todo-app $CHART \
             --set backend.image=$REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/backend:$(BACKEND_TAG) \
             --set frontend.image=$REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/frontend:$(FRONTEND_TAG) \
