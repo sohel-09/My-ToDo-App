@@ -159,15 +159,12 @@
 #       artifact: build-info
 #       displayName: "Publish build metadata artifact"
 
-trigger: none
 
-resources:
-  pipelines:
-  - pipeline: CI
-    source: ToDo-CI
-    trigger:
-      branches:
-        - main
+trigger:
+  branches:
+    include:
+      - main
+      - feature/*
 
 pool:
   vmImage: ubuntu-latest
@@ -176,103 +173,91 @@ variables:
   PROJECT_ID: 'fluted-factor-438905-d2'
   REGION: 'asia-south1'
   REPO_NAME: 'todo-repo'
-  CLUSTER_NAME: 'todo-cluster'
-  CLUSTER_ZONE: 'asia-south1-a'
   SERVICE_ACCOUNT: 'todo-deployer@fluted-factor-438905-d2.iam.gserviceaccount.com'
 
 stages:
-- stage: Deploy
-  displayName: Deploy using Terraform & Helm
+
+# ========================================================
+# STAGE 1 — BUILD & PUSH DOCKER IMAGES
+# ========================================================
+- stage: Build
+  displayName: Build and Push Docker Images
   jobs:
-  - job: DeployToGKE
-    displayName: Apply Infra + Deploy App
+
+  - job: BuildAndPush
     steps:
     - checkout: self
 
-    # ============================
-    # 1️⃣ Download CI artifacts
-    # ============================
-    - download: CI
-      artifact: deploy_artifacts
-    - task: Bash@3
-      displayName: "Extract Deployment Metadata"
-      inputs:
-        targetType: inline
-        script: |
-          echo "Extracting deploy_info.txt..."
-          cat $(Pipeline.Workspace)/deploy_artifacts/deploy_info.txt
-
-          export STATIC_IP=$(grep STATIC_IP $(Pipeline.Workspace)/deploy_artifacts/deploy_info.txt | cut -d'=' -f2)
-          export FRONTEND_TAG=$(grep FRONTEND_TAG $(Pipeline.Workspace)/deploy_artifacts/deploy_info.txt | cut -d'=' -f2)
-          export BACKEND_TAG=$(grep BACKEND_TAG $(Pipeline.Workspace)/deploy_artifacts/deploy_info.txt | cut -d'=' -f2)
-          echo "STATIC_IP=$STATIC_IP"
-          echo "FRONTEND_TAG=$FRONTEND_TAG"
-          echo "BACKEND_TAG=$BACKEND_TAG"
-
-          echo "##vso[task.setvariable variable=STATIC_IP]$STATIC_IP"
-          echo "##vso[task.setvariable variable=FRONTEND_TAG]$FRONTEND_TAG"
-          echo "##vso[task.setvariable variable=BACKEND_TAG]$BACKEND_TAG"
-
-    # ============================
-    # 2️⃣ Authenticate to GCP
-    # ============================
+    # 1️⃣ Download Secure File (GCP SA Key)
     - task: DownloadSecureFile@1
       name: GCloudKey
       inputs:
         secureFile: 'key.json'
 
+    # 2️⃣ Authenticate with Google Cloud
     - task: Bash@3
-      displayName: "Authenticate to GCP & Connect to GKE"
+      displayName: 'GCloud Authenticate'
       inputs:
         targetType: inline
         script: |
+          echo "Activating Service Account..."
           gcloud auth activate-service-account $SERVICE_ACCOUNT --key-file "$(GCloudKey.secureFilePath)"
           gcloud config set project $PROJECT_ID
-          gcloud components install gke-gcloud-auth-plugin
-          export USE_GKE_GCLOUD_AUTH_PLUGIN=True
-          gcloud container clusters get-credentials $CLUSTER_NAME --zone $CLUSTER_ZONE --project $PROJECT_ID
+          gcloud auth configure-docker $REGION-docker.pkg.dev --quiet
 
-    # ============================
-    # 3️⃣ Terraform — Apply Infrastructure
-    # ============================
+    # 3️⃣ Build Docker Images
     - task: Bash@3
-      displayName: "Terraform Apply"
+      displayName: 'Build Docker Images'
       inputs:
         targetType: inline
         script: |
-          cd $(Pipeline.Workspace)/deploy_artifacts/terraform
-          terraform init
-          terraform apply -auto-approve
+          docker build -t frontend:$(Build.BuildId) ./frontend
+          docker build -t backend:$(Build.BuildId) ./backend
 
-    # ============================
-    # 4️⃣ Helm Deployment
-    # ============================
-    - task: HelmInstaller@1
-      inputs:
-        helmVersionToInstall: '3.14.0'
-
+    # 4️⃣ Tag & Push to Artifact Registry
     - task: Bash@3
-      displayName: "Deploy with Helm"
+      displayName: 'Push Docker Images'
       inputs:
         targetType: inline
         script: |
-          echo "Deploying backend:$BACKEND_TAG and frontend:$FRONTEND_TAG"
-          echo "Backend static IP: $STATIC_IP"
+          docker tag frontend:$(Build.BuildId) $REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/frontend:$(Build.BuildId)
+          docker tag backend:$(Build.BuildId) $REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/backend:$(Build.BuildId)
 
-          helm upgrade --install todo-app $(Pipeline.Workspace)/deploy_artifacts/*.tgz \
-            --set backend.image=$REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/backend:$BACKEND_TAG \
-            --set frontend.image=$REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/frontend:$FRONTEND_TAG \
-            --set backend.staticIP=$STATIC_IP
+          docker push $REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/frontend:$(Build.BuildId)
+          docker push $REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/backend:$(Build.BuildId)
 
-          echo "Helm deployment completed."
+          echo "Successfully pushed images."
 
-    # ============================
-    # 5️⃣ Verify deployment
-    # ============================
+    # ========================================================
+    # 5️⃣ PACKAGE HELM CHART & COLLECT DEPLOYMENT ARTIFACTS
+    # ========================================================
     - task: Bash@3
-      displayName: "Verify deployment"
+      displayName: "Package Helm Chart"
       inputs:
         targetType: inline
         script: |
-          kubectl get pods -o wide
-          kubectl get svc -o wide
+          echo "Packaging Helm chart..."
+          mkdir -p $(Pipeline.Workspace)/deploy_artifacts
+
+          helm lint ./helm
+          helm package ./helm --destination $(Pipeline.Workspace)/deploy_artifacts
+
+          cp -r terraform $(Pipeline.Workspace)/deploy_artifacts/terraform
+          cp helm/values.yaml $(Pipeline.Workspace)/deploy_artifacts/values.yaml
+
+          # Extract static IP from values.yaml for CD stage
+          STATIC_IP=$(grep staticIP -A 1 helm/values.yaml | awk '{print $2}' | tr -d '"')
+          echo "STATIC_IP=$STATIC_IP" >> $(Pipeline.Workspace)/deploy_artifacts/deploy_info.txt
+
+          # Save image tags
+          echo "FRONTEND_TAG=$(Build.BuildId)" >> $(Pipeline.Workspace)/deploy_artifacts/deploy_info.txt
+          echo "BACKEND_TAG=$(Build.BuildId)" >> $(Pipeline.Workspace)/deploy_artifacts/deploy_info.txt
+          echo "PROJECT_ID=$PROJECT_ID" >> $(Pipeline.Workspace)/deploy_artifacts/deploy_info.txt
+          echo "REGION=$REGION" >> $(Pipeline.Workspace)/deploy_artifacts/deploy_info.txt
+          echo "REPO_NAME=$REPO_NAME" >> $(Pipeline.Workspace)/deploy_artifacts/deploy_info.txt
+
+          echo "Artifacts packaged."
+
+    - publish: $(Pipeline.Workspace)/deploy_artifacts
+      artifact: deploy_artifacts
+      displayName: "Publish Helm + Terraform + Metadata"
