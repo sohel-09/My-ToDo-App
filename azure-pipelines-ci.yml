@@ -261,3 +261,25 @@ stages:
     - publish: $(Pipeline.Workspace)/deploy_artifacts
       artifact: deploy_artifacts
       displayName: "Publish Helm + Terraform + Metadata"
+      
+        # DEBUG: Inspect CI artifact paths
+    - task: Bash@3
+      displayName: "DEBUG: Show CI Paths"
+      inputs:
+        targetType: inline
+        script: |
+          echo "=== Pipeline.Workspace ==="
+          echo "$(Pipeline.Workspace)"
+          ls -R $(Pipeline.Workspace)
+
+          echo "=== Agent.BuildDirectory ==="
+          echo "$(Agent.BuildDirectory)"
+          ls -R $(Agent.BuildDirectory)
+
+          echo "=== System.DefaultWorkingDirectory ==="
+          echo "$(System.DefaultWorkingDirectory)"
+          ls -R $(System.DefaultWorkingDirectory)
+
+          echo "=== Agent.TempDirectory ==="
+          echo "$(Agent.TempDirectory)"
+          ls -R $(Agent.TempDirectory)
