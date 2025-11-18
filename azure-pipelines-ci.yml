@@ -85,7 +85,7 @@ pool:
 variables:
   PROJECT_ID: 'fluted-factor-438905-d2'
   REGION: 'asia-south1'
-  ZONE: 'asia-south1-a'
+  CLUSTER_ZONE: 'asia-south1-a'
   REPO_NAME: 'todo-repo'
   SERVICE_ACCOUNT: 'todo-deployer@fluted-factor-438905-d2.iam.gserviceaccount.com'
 
