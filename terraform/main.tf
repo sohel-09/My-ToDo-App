@@ -41,18 +41,18 @@ resource "google_container_cluster" "todo_cluster" {
 }
 
 
-# CREATE ONLY NODE POOL (optional)
-#
-# resource "google_container_node_pool" "todo_nodes" {
-#   name       = "todo-nodes"
-#   cluster    = data.google_container_cluster.todo_cluster.id
-#   location   = var.zone
+# NODE POOL 
+resource "google_container_node_pool" "todo_nodes" {
+  name       = "todo-nodes"
+  cluster    = google_container_cluster.todo_cluster.name
+  location   = var.zone
 
-#   node_config {
-#     machine_type = "e2-medium"
-#   }
+  node_config {
+    machine_type = "e2-medium"
+    oauth_scopes = ["https://www.googleapis.com/auth/cloud-platform"]
+  }
 
-#   initial_node_count = 1
-# }
+  initial_node_count = 1
+}
 
 
