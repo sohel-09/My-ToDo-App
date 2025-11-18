@@ -11,6 +11,8 @@ build/
 # Docker
 *.log
 *.tmp
+docker-compose.yml
+
 
 # GCP service account key (sensitive)
 key.json
@@ -19,3 +21,4 @@ key.json
 *.tfstate
 *.tfstate.*
 terraform.tfstate
+tfstate.backup.json

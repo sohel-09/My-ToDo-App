@@ -18,8 +18,8 @@ COPY . .
 EXPOSE 3000
 
 # Run as non-root user for security
-RUN adduser -D appuser
-USER appuser
+USER node
+
 
 # Start the server
 CMD ["node", "server.js"]

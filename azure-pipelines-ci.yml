@@ -73,93 +73,6 @@
 #       artifact: k8s-manifests
 #       displayName: 'Publish Kubernetes manifests as artifacts'
 
-# trigger:
-#   branches:
-#     include:
-#       - main
-#       - feature/*
-
-# pool:
-#   vmImage: ubuntu-latest
-
-# variables:
-#   PROJECT_ID: 'fluted-factor-438905-d2'
-#   REGION: 'asia-south1'
-#   REPO_NAME: 'todo-repo'
-#   SERVICE_ACCOUNT: 'todo-deployer@fluted-factor-438905-d2.iam.gserviceaccount.com'
-
-# stages:
-# # ---------- Stage 1: Build and Push ----------
-# - stage: Build
-#   displayName: Build and Push Docker Images
-#   jobs:
-#   - job: BuildAndPush
-#     displayName: Build & Push to Google Artifact Registry
-#     steps:
-#     - checkout: self
-
-#     # 1️⃣ Download Secure File (GCP Service Account JSON)
-#     - task: DownloadSecureFile@1
-#       name: GCloudKey
-#       inputs:
-#         secureFile: 'key.json'
-
-#     # 2️⃣ Authenticate to Google Cloud
-#     - task: Bash@3
-#       displayName: 'Authenticate to Google Artifact Registry'
-#       inputs:
-#         targetType: 'inline'
-#         script: |
-#           echo "Authenticating with Google Cloud..."
-#           gcloud auth activate-service-account $SERVICE_ACCOUNT --key-file "$(GCloudKey.secureFilePath)"
-#           gcloud config set project $PROJECT_ID
-#           gcloud auth configure-docker $REGION-docker.pkg.dev --quiet
-#       env:
-#         PROJECT_ID: $(PROJECT_ID)
-#         REGION: $(REGION)
-#         SERVICE_ACCOUNT: $(SERVICE_ACCOUNT)
-
-#     # 3️⃣ Build Docker Images
-#     - task: Bash@3
-#       displayName: 'Build Docker Images'
-#       inputs:
-#         targetType: 'inline'
-#         script: |
-#           echo "Building Docker images for frontend and backend..."
-#           docker build -t frontend:$(Build.BuildId) ./frontend
-#           docker build -t backend:$(Build.BuildId) ./backend
-
-#     # 4️⃣ Push Docker Images to Google Artifact Registry
-#     - task: Bash@3
-#       displayName: 'Push to Google Artifact Registry'
-#       inputs:
-#         targetType: 'inline'
-#         script: |
-#           echo "Tagging and pushing images to Artifact Registry..."
-#           docker tag frontend:$(Build.BuildId) $REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/frontend:$(Build.BuildId)
-#           docker tag backend:$(Build.BuildId) $REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/backend:$(Build.BuildId)
-
-#           docker push $REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/frontend:$(Build.BuildId)
-#           docker push $REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/backend:$(Build.BuildId)
-
-#           echo "✅ Successfully pushed Docker images for Build ID: $(Build.BuildId)"
-
-#     # 5️⃣ Publish build metadata (for CD pipeline)
-#     - task: Bash@3
-#       displayName: "Export Build Metadata"
-#       inputs:
-#         targetType: inline
-#         script: |
-#           echo "BUILD_ID=$(Build.BuildId)" >> $(Pipeline.Workspace)/build_metadata.txt
-#           echo "PROJECT_ID=$(PROJECT_ID)" >> $(Pipeline.Workspace)/build_metadata.txt
-#           echo "REGION=$(REGION)" >> $(Pipeline.Workspace)/build_metadata.txt
-#           echo "REPO_NAME=$(REPO_NAME)" >> $(Pipeline.Workspace)/build_metadata.txt
-
-#     - publish: $(Pipeline.Workspace)/build_metadata.txt
-#       artifact: build-info
-#       displayName: "Publish build metadata artifact"
-
-
 trigger:
   branches:
     include:
@@ -177,9 +90,8 @@ variables:
 
 stages:
 
-# ========================================================
 # STAGE 1 — BUILD & PUSH DOCKER IMAGES
-# ========================================================
+
 - stage: Build
   displayName: Build and Push Docker Images
   jobs:
@@ -188,13 +100,13 @@ stages:
     steps:
     - checkout: self
 
-    # 1️⃣ Download Secure File (GCP SA Key)
+    #  Download Secure File (GCP SA Key)
     - task: DownloadSecureFile@1
       name: GCloudKey
       inputs:
         secureFile: 'key.json'
 
-    # 2️⃣ Authenticate with Google Cloud
+    #  Authenticate with Google Cloud
     - task: Bash@3
       displayName: 'GCloud Authenticate'
       inputs:
@@ -205,7 +117,7 @@ stages:
           gcloud config set project $PROJECT_ID
           gcloud auth configure-docker $REGION-docker.pkg.dev --quiet
 
-    # 3️⃣ Build Docker Images
+    # Build Docker Images
     - task: Bash@3
       displayName: 'Build Docker Images'
       inputs:
@@ -214,7 +126,7 @@ stages:
           docker build -t frontend:$(Build.BuildId) ./frontend
           docker build -t backend:$(Build.BuildId) ./backend
 
-    # 4️⃣ Tag & Push to Artifact Registry
+    #  Tag & Push to Artifact Registry
     - task: Bash@3
       displayName: 'Push Docker Images'
       inputs:
@@ -233,7 +145,7 @@ stages:
       inputs:
         helmVersionToInstall: '3.14.0'
 
-    # 5️⃣ PACKAGE HELM CHART & COLLECT DEPLOYMENT ARTIFACTS
+    # PACKAGE HELM CHART & COLLECT DEPLOYMENT ARTIFACTS
 
     - task: Bash@3
       displayName: "Package Helm Chart"
@@ -268,23 +180,23 @@ stages:
       displayName: "Publish Helm + Terraform + Metadata"
 
         # DEBUG: Inspect CI artifact paths
-    - task: Bash@3
-      displayName: "DEBUG: Show CI Paths"
-      inputs:
-        targetType: inline
-        script: |
-          echo "=== Pipeline.Workspace ==="
-          echo "$(Pipeline.Workspace)"
-          ls -R $(Pipeline.Workspace)
+    # - task: Bash@3
+    #   displayName: "DEBUG: Show CI Paths"
+    #   inputs:
+    #     targetType: inline
+    #     script: |
+    #       echo "=== Pipeline.Workspace ==="
+    #       echo "$(Pipeline.Workspace)"
+    #       ls -R $(Pipeline.Workspace)
 
-          echo "=== Agent.BuildDirectory ==="
-          echo "$(Agent.BuildDirectory)"
-          ls -R $(Agent.BuildDirectory)
+    #       echo "=== Agent.BuildDirectory ==="
+    #       echo "$(Agent.BuildDirectory)"
+    #       ls -R $(Agent.BuildDirectory)
 
-          echo "=== System.DefaultWorkingDirectory ==="
-          echo "$(System.DefaultWorkingDirectory)"
-          ls -R $(System.DefaultWorkingDirectory)
+    #       echo "=== System.DefaultWorkingDirectory ==="
+    #       echo "$(System.DefaultWorkingDirectory)"
+    #       ls -R $(System.DefaultWorkingDirectory)
 
-          echo "=== Agent.TempDirectory ==="
-          echo "$(Agent.TempDirectory)"
-          ls -R $(Agent.TempDirectory)
+    #       echo "=== Agent.TempDirectory ==="
+    #       echo "$(Agent.TempDirectory)"
+    #       ls -R $(Agent.TempDirectory)
