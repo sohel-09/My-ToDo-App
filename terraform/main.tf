@@ -56,11 +56,3 @@ resource "google_container_cluster" "todo_cluster" {
 # }
 
 
-# READ EXISTING ARTIFACT REGISTRY REPO
-
-data "google_artifact_registry_repository" "todo_repo" {
-  repository_id = "todo-repo"
-  location      = var.region
-}
-
-
