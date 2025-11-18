@@ -16,18 +16,18 @@ provider "google" {
   credentials = base64decode(var.gcp_credentials)    # CD Pipeline injects this
 }
 
-# -------------------------------
+#
 # READ EXISTING GKE CLUSTER
-# -------------------------------
+#
 data "google_container_cluster" "todo_cluster" {
   name     = "todo-cluster"
   location = var.zone
 }
 
-# -------------------------------
+#
 # CREATE ONLY NODE POOL (optional)
-# -------------------------------
-data "google_container_node_pool" "todo_nodes" {
+#
+resource "google_container_node_pool" "todo_nodes" {
   name       = "todo-nodes"
   cluster    = data.google_container_cluster.todo_cluster.id
   location   = var.zone
@@ -39,9 +39,9 @@ data "google_container_node_pool" "todo_nodes" {
   initial_node_count = 1
 }
 
-# -------------------------------
+
 # READ EXISTING ARTIFACT REGISTRY REPO
-# -------------------------------
+#
 data "google_artifact_registry_repository" "todo_repo" {
   repository_id = "todo-repo"
   location      = var.region

@@ -98,3 +98,12 @@ kubectl get pods -o wide
 kubectl get svc    
 
 ....
+
+terraform import google_container_node_pool.todo_nodes "projects/${var.project_id}/locations/${var.zone}/clusters/todo-cluster/nodePools/todo-nodes"
+
+
+gcloud projects add-iam-policy-binding fluted-factor-438905-d2 --member="serviceAccount:todo-deployer@fluted-factor-438905-d2.iam.gserviceaccount.com" --role="roles/resourcemanager.projectIamAdmin"
+
+gcloud projects add-iam-policy-binding fluted-factor-438905-d2 --member="serviceAccount:todo-deployer@fluted-factor-438905-d2.iam.gserviceaccount.com" --role="roles/container.admin"
+
+gcloud projects add-iam-policy-binding fluted-factor-438905-d2 --member="serviceAccount:todo-deployer@fluted-factor-438905-d2.iam.gserviceaccount.com" --role="roles/compute.admin"
