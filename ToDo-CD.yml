@@ -204,7 +204,7 @@ stages:
     steps:
     - checkout: self
 
-    # 🔥 NEW: Install Google Cloud SDK (required for GKE auth plugin)
+    # NEW: Install Google Cloud SDK (required for GKE auth plugin)
     - task: Bash@3
       displayName: "Install Google Cloud SDK & GKE Auth Plugin"
       inputs:
@@ -247,7 +247,7 @@ stages:
         script: |
           FILE=$(Pipeline.Workspace)/CI/deploy_artifacts/deploy_info.txt
 
-          export STATIC_IP=$(grep STATIC_IP $FILE | cut -d'=' -f2)
+  
           export FRONTEND_TAG=$(grep FRONTEND_TAG $FILE | cut -d'=' -f2)
           export BACKEND_TAG=$(grep BACKEND_TAG $FILE | cut -d'=' -f2)
 
@@ -278,38 +278,6 @@ stages:
 
           echo "Fetching GKE credentials..."
           gcloud container clusters get-credentials $CLUSTER_NAME --zone $CLUSTER_ZONE --project $PROJECT_ID
-
-
-    # 4️⃣ INSTALL TERRAFORM
-    - task: TerraformInstaller@1
-      displayName: "Install Terraform"
-      inputs:
-        terraformVersion: '1.6.0'
-
-    # 5️⃣ TERRAFORM APPLY
-    - task: Bash@3
-      displayName: "Terraform Apply"
-      inputs:
-        targetType: inline
-        script: |
-          cd $(Pipeline.Workspace)/CI/deploy_artifacts/terraform
-
-          terraform init
-
-          BASE64_KEY=$(cat "$(GCloudKey.secureFilePath)" | base64 | tr -d '\n')
-
-          cat <<EOF > terraform.auto.tfvars
-          project_id      = "${PROJECT_ID}"
-          region          = "${REGION}"
-          zone            = "${CLUSTER_ZONE}"
-          gcp_credentials = "${BASE64_KEY}"
-          EOF
-
-          echo "Generated terraform.auto.tfvars:"
-          cat terraform.auto.tfvars
-
-          terraform apply -auto-approve
-
 
     # 6️⃣ INSTALL HELM
     - task: HelmInstaller@1

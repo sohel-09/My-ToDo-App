@@ -117,6 +117,37 @@ stages:
           gcloud config set project $PROJECT_ID
           gcloud auth configure-docker $REGION-docker.pkg.dev --quiet
 
+
+    # INSTALL TERRAFORM
+    - task: TerraformInstaller@1
+      displayName: "Install Terraform"
+      inputs:
+        terraformVersion: '1.6.0'
+
+    # TERRAFORM APPLY
+    - task: Bash@3
+      displayName: "Terraform Apply"
+      inputs:
+        targetType: inline
+        script: |
+          cd $(Build.SourcesDirectory)/terraform
+
+          terraform init
+
+          BASE64_KEY=$(cat "$(GCloudKey.secureFilePath)" | base64 | tr -d '\n')
+
+          cat <<EOF > terraform.auto.tfvars
+          project_id      = "${PROJECT_ID}"
+          region          = "${REGION}"
+          zone            = "${CLUSTER_ZONE}"
+          gcp_credentials = "${BASE64_KEY}"
+          EOF
+
+          echo "Generated terraform.auto.tfvars:"
+          cat terraform.auto.tfvars
+
+          terraform apply -auto-approve
+
     # Build Docker Images
     - task: Bash@3
       displayName: 'Build Docker Images'
@@ -155,15 +186,9 @@ stages:
           echo "Packaging Helm chart..."
           mkdir -p $(Pipeline.Workspace)/deploy_artifacts
 
-          helm lint ./helm
           helm package ./helm --destination $(Pipeline.Workspace)/deploy_artifacts
-
           cp -r terraform $(Pipeline.Workspace)/deploy_artifacts/terraform
           cp helm/values.yaml $(Pipeline.Workspace)/deploy_artifacts/values.yaml
-
-          # Extract static IP from values.yaml for CD stage
-          STATIC_IP=$(grep staticIP -A 1 helm/values.yaml | awk '{print $2}' | tr -d '"')
-          echo "STATIC_IP=$STATIC_IP" >> $(Pipeline.Workspace)/deploy_artifacts/deploy_info.txt
 
           # Save image tags
           echo "FRONTEND_TAG=$(Build.BuildId)" >> $(Pipeline.Workspace)/deploy_artifacts/deploy_info.txt
