@@ -305,6 +305,28 @@ stages:
     steps:
     - checkout: self
 
+    # 🔥 NEW: Install Google Cloud SDK (required for GKE auth plugin)
+    - task: Bash@3
+      displayName: "Install Google Cloud SDK & GKE Auth Plugin"
+      inputs:
+        targetType: inline
+        script: |
+          echo "Installing Google Cloud SDK..."
+          sudo apt-get update -y
+          sudo apt-get install -y apt-transport-https ca-certificates gnupg curl
+
+          echo "Adding Google Cloud repo..."
+          echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] http://packages.cloud.google.com/apt cloud-sdk main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
+          curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key --keyring /usr/share/keyrings/cloud.google.gpg add -
+
+          sudo apt-get update -y
+          sudo apt-get install -y google-cloud-sdk google-cloud-sdk-gke-gcloud-auth-plugin
+
+          echo "Plugin installed successfully!"
+          export USE_GKE_GCLOUD_AUTH_PLUGIN=True
+          echo "USE_GKE_GCLOUD_AUTH_PLUGIN=True" >> $HOME/.bashrc
+
+
     # 1️⃣ DOWNLOAD ARTIFACTS
     - download: CI
       artifact: deploy_artifacts
@@ -350,17 +372,20 @@ stages:
         targetType: inline
         script: |
           echo "Authenticating..."
+          export USE_GKE_GCLOUD_AUTH_PLUGIN=True
+
           gcloud auth activate-service-account $SERVICE_ACCOUNT --key-file "$(GCloudKey.secureFilePath)"
           gcloud config set project $PROJECT_ID
-          export USE_GKE_GCLOUD_AUTH_PLUGIN=True
-          gcloud container clusters get-credentials $CLUSTER_NAME --zone $CLUSTER_ZONE
+
+          echo "Fetching GKE credentials..."
+          gcloud container clusters get-credentials $CLUSTER_NAME --zone $CLUSTER_ZONE --project $PROJECT_ID
+
 
     # 4️⃣ INSTALL TERRAFORM
     - task: TerraformInstaller@1
       displayName: "Install Terraform"
       inputs:
         terraformVersion: '1.6.0'
-
 
     # 5️⃣ TERRAFORM APPLY
     - task: Bash@3
@@ -369,7 +394,7 @@ stages:
         targetType: inline
         script: |
           cd $(Pipeline.Workspace)/CI/deploy_artifacts/terraform
-          
+
           terraform init
 
           BASE64_KEY=$(cat "$(GCloudKey.secureFilePath)" | base64 | tr -d '\n')
