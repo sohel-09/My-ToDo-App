@@ -34,7 +34,8 @@ ToDo-app/
 │   │    ├── frontend-service.yaml
 │   │    ├── frontend-config.yaml
 │   │    ├── mysql-deployment.yaml
-│   │    └── mysql-secret.yaml
+│   │    ├── mysql-secret.yaml
+│   │    └── mysql-init-configmap
 │   │        
 │   ├──Chart.yaml
 │   └──values.yaml
