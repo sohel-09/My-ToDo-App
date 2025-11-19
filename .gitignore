@@ -21,4 +21,22 @@ key.json
 *.tfstate
 *.tfstate.*
 terraform.tfstate
+terraform.tfstate.*
+
 tfstate.backup.json
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform*
+crash.log
+override.tf
+override.tf.json
+*.tfvars
+*.tfvars.json
+
+
+setup.txt
+
+.vscode/
+
