@@ -25,6 +25,9 @@ terraform.tfstate.*
 
 tfstate.backup.json
 # Terraform
+terraform/.terraform/
+terraform/.terraform/*
+
 *.tfstate
 *.tfstate.*
 .terraform/
