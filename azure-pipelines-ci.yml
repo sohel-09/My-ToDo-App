@@ -87,6 +87,7 @@ variables:
   REGION: 'asia-south1'
   CLUSTER_ZONE: 'asia-south1-a'
   REPO_NAME: 'todo-repo'
+  CLUSTER_NAME: 'todo-cluster'
   SERVICE_ACCOUNT: 'todo-deployer@fluted-factor-438905-d2.iam.gserviceaccount.com'
 
 stages:
@@ -126,16 +127,44 @@ stages:
         terraformVersion: '1.6.0'
 
     # TERRAFORM APPLY
+    # - task: Bash@3
+    #   displayName: "Terraform Apply"
+    #   inputs:
+    #     targetType: inline
+    #     script: |
+    #       cd $(Build.SourcesDirectory)/terraform
+
+    #       terraform init
+
+    #       BASE64_KEY=$(cat "$(GCloudKey.secureFilePath)" | base64 | tr -d '\n')
+
+    #       cat <<EOF > terraform.auto.tfvars
+    #       project_id      = "${PROJECT_ID}"
+    #       region          = "${REGION}"
+    #       zone            = "${CLUSTER_ZONE}"
+    #       gcp_credentials = "${BASE64_KEY}"
+    #       EOF
+
+    #       echo "Generated terraform.auto.tfvars:"
+    #       cat terraform.auto.tfvars
+
+    #       terraform apply -auto-approve
+        # TERRAFORM APPLY (with auto-import if resources already exist)
     - task: Bash@3
-      displayName: "Terraform Apply"
+      displayName: "Terraform Init / Import (if exists) / Apply"
       inputs:
         targetType: inline
         script: |
+          set -euo pipefail
+
           cd $(Build.SourcesDirectory)/terraform
 
-          terraform init
+          echo "Initializing Terraform..."
+          terraform init -input=false
 
-          BASE64_KEY=$(cat "$(GCloudKey.secureFilePath)" | base64 | tr -d '\n')
+          echo "Preparing terraform.auto.tfvars with base64 encoded key..."
+          # base64 on Linux: -w 0 to avoid newlines; tr -d '\n' is fallback
+          BASE64_KEY=$(base64 -w 0 "$(GCloudKey.secureFilePath)" 2>/dev/null || cat "$(GCloudKey.secureFilePath)" | base64 | tr -d '\n')
 
           cat <<EOF > terraform.auto.tfvars
           project_id      = "${PROJECT_ID}"
@@ -144,10 +173,54 @@ stages:
           gcp_credentials = "${BASE64_KEY}"
           EOF
 
-          echo "Generated terraform.auto.tfvars:"
-          cat terraform.auto.tfvars
+          echo "terraform.auto.tfvars written:"
+          sed -n '1,120p' terraform.auto.tfvars | sed 's/^\(.*gcp_credentials = \)".*"$/\1"<REDACTED>"/'
 
+          # Ensure gcloud is authenticated (should already be from earlier step in pipeline)
+          echo "Verifying gcloud auth..."
+          gcloud auth activate-service-account $SERVICE_ACCOUNT --key-file "$(GCloudKey.secureFilePath)" || true
+          gcloud config set project $PROJECT_ID
+
+          # 1) Import existing GKE cluster (if it exists)
+          echo "Checking for existing GKE cluster: ${CLUSTER_NAME} in zone ${CLUSTER_ZONE}..."
+          if gcloud container clusters describe "${CLUSTER_NAME}" --zone "${CLUSTER_ZONE}" --project "${PROJECT_ID}" >/dev/null 2>&1; then
+            echo "Cluster exists. Attempting terraform import for google_container_cluster.todo_cluster..."
+            # Build the import id in the required format: projects/PROJECT/locations/ZONE/clusters/CLUSTER
+            CLUSTER_IMPORT_ID="projects/${PROJECT_ID}/locations/${CLUSTER_ZONE}/clusters/${CLUSTER_NAME}"
+            # safe import: if already imported terraform import will exit non-zero, so capture and continue
+            if terraform state list | grep -q "^google_container_cluster\.todo_cluster$"; then
+              echo "google_container_cluster.todo_cluster already in state — skipping import."
+            else
+              echo "Importing cluster resource into terraform state..."
+              terraform import -input=false google_container_cluster.todo_cluster "${CLUSTER_IMPORT_ID}" || {
+                echo "terraform import for cluster returned non-zero. Continuing; if this is 'already imported', it's ok."
+              }
+            fi
+          else
+            echo "Cluster not found in GCP. Terraform will create it."
+          fi
+
+          # 2) Import existing Artifact Registry repo (if it exists)
+          echo "Checking for existing Artifact Registry repo: ${REPO_NAME} in region ${REGION}..."
+          if gcloud artifacts repositories describe "${REPO_NAME}" --location="${REGION}" --project="${PROJECT_ID}" >/dev/null 2>&1; then
+            echo "Repository exists. Attempting terraform import for google_artifact_registry_repository.todo_repo..."
+            REPO_IMPORT_ID="projects/${PROJECT_ID}/locations/${REGION}/repositories/${REPO_NAME}"
+            if terraform state list | grep -q "^google_artifact_registry_repository\.todo_repo$"; then
+              echo "google_artifact_registry_repository.todo_repo already in state — skipping import."
+            else
+              echo "Importing artifact registry repo into terraform state..."
+              terraform import -input=false google_artifact_registry_repository.todo_repo "${REPO_IMPORT_ID}" || {
+                echo "terraform import for repo returned non-zero. Continuing; if this is 'already imported', it's ok."
+              }
+            fi
+          else
+            echo "Artifact Registry repo not found. Terraform will create it."
+          fi
+
+          # 3) Now apply Terraform (it will create missing resources and manage imported ones)
+          echo "Running terraform apply..."
           terraform apply -auto-approve
+
 
     # Build Docker Images
     - task: Bash@3

@@ -11,7 +11,7 @@ mysql:
 
   resources:
     requests:
-      cpu: "100m"
+      cpu: "10m"
       memory: "256Mi"
     limits:
       cpu: "300m"
@@ -56,7 +56,7 @@ backend:
     periodSeconds: 20
 
   service:
-    type: ClusterIP
+    type: LoadBalancer
     port: 3000
 
 
