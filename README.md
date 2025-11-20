@@ -26,11 +26,11 @@ ToDo-app/
 ├── db/
 │   └── init.sql
 │
-├── helm
-│   ├──db
+├── helm/
+│   ├──db/
 │   │   └──init.sql
 │   │    
-│   ├──templates 
+│   ├──templates/ 
 │   │   ├── backend-deployment.yaml
 │   │   ├── backend-service.yaml
 │   │   ├── frontend-deployment.yaml
